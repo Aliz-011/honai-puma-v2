@@ -1,16 +1,22 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { DM_Sans, Lora, IBM_Plex_Mono } from "next/font/google";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+import { QueryProvider } from "@/components/query-provider";
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider";
+
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const ibmPlexMono = IBM_Plex_Mono({
+  weight: ['400', '500', '600'],
+  variable: "--font-ibm-plex-mono"
+})
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -23,11 +29,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${dmSans.className} ${ibmPlexMono.className} antialiased`}
       >
-        {children}
+        <QueryProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+            <Toaster richColors />
+            <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
   );
