@@ -1,6 +1,11 @@
+import { Metadata } from 'next'
+
 import { Separator } from '@/components/ui/separator'
 import { PasswordForm } from '../_components/password-form'
 
+export const metadata: Metadata = {
+  title: 'Update Password | Honai Puma'
+}
 
 export default function RouteComponent() {
   return (

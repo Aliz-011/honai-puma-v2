@@ -4,13 +4,26 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { InferRequestType, InferResponseType } from "hono"
+import { HTTPResponseError } from "hono/types"
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { client } from "@/lib/client";
+
+type ResponseType = InferResponseType<typeof client.api['update-password']['$post']>
+type RequestType = InferRequestType<typeof client.api['update-password']['$post']>['json']
 
 export const PasswordForm = () => {
-    // const mutation = useMutation()
+    const mutation = useMutation<ResponseType, HTTPResponseError, RequestType>({
+        mutationFn: async json => {
+            const response = await client.api['update-password']['$post']({ json })
+
+            return await response.json()
+        }
+    })
+
     const queryClient = useQueryClient()
 
     const form = useForm({
@@ -39,18 +52,17 @@ export const PasswordForm = () => {
             })
         },
         onSubmit: async ({ value }) => {
-            // await mutation.mutateAsync(
-            //     { newPassword: value.newPassword, oldPassword: value.password },
-            //     {
-            //         onSuccess: ({ message }) => {
-            //             queryClient.invalidateQueries({ queryKey: ['current-session'] })
-            //             toast.success(message)
-            //         },
-            //         onError: (error) => {
-            //             toast.error(error.message)
-            //         },
-            //     }
-            // )
+            await mutation.mutateAsync(
+                { newPassword: value.newPassword, oldPassword: value.password },
+                {
+                    onSuccess: ({ message }) => {
+                        queryClient.invalidateQueries({ queryKey: ['current-session'] })
+                        toast.success(message)
+                    },
+                    onError: (error) => {
+                        toast.error(error.message)
+                    },
+                })
         }
     })
 

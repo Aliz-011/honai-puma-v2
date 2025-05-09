@@ -1,5 +1,10 @@
 import { Separator } from '@/components/ui/separator'
 import { AccountForm } from './_components/account-form'
+import { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Account | Honai Puma'
+}
 
 export default function RouteComponent() {
   return (

@@ -193,7 +193,7 @@ const data = {
                 },
                 {
                     title: "WL Connect Wifi",
-                    url: "#",
+                    url: "/honai/fmc/connect-wifi",
                 }
             ],
         }

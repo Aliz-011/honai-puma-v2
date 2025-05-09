@@ -4,17 +4,27 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { z } from "zod"
+import { InferRequestType, InferResponseType } from "hono"
+import { HTTPResponseError } from "hono/types"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useCurrentSession } from "@/hooks/use-current-session"
+import { client } from "@/lib/client"
 
+type ResponseType = InferResponseType<typeof client.api['update-profile']['$post']>
+type RequestType = InferRequestType<typeof client.api['update-profile']['$post']>['json']
 
 export const AccountForm = () => {
     const { data } = useCurrentSession()
+    const mutation = useMutation<ResponseType, HTTPResponseError, RequestType>({
+        mutationFn: async json => {
+            const response = await client.api['update-profile']['$post']({ json })
 
-    // const mutation = useMutation(trpc.user.updateProfile.mutationOptions())
+            return await response.json()
+        }
+    })
     const queryClient = useQueryClient()
 
     const form = useForm({
@@ -39,18 +49,18 @@ export const AccountForm = () => {
             })
         },
         onSubmit: async ({ value }) => {
-            // await mutation.mutateAsync(
-            //     { nik: value.nik, phoneNumber: value.phoneNumber },
-            //     {
-            //         onSuccess: ({ message }) => {
-            //             queryClient.invalidateQueries({ queryKey: ['current-session'] })
-            //             toast.success(message)
-            //         },
-            //         onError: (error) => {
-            //             toast.error(error.message)
-            //         },
-            //     }
-            // )
+            await mutation.mutateAsync(
+                { nik: value.nik, phoneNumber: value.phoneNumber },
+                {
+                    onSuccess: ({ message }) => {
+                        queryClient.invalidateQueries({ queryKey: ['current-session'] })
+                        toast.success(message)
+                    },
+                    onError: (error) => {
+                        toast.error(error.message)
+                    },
+                }
+            )
         }
     })
 
@@ -92,6 +102,7 @@ export const AccountForm = () => {
                                 id={field.name}
                                 name={field.name}
                                 type="text"
+                                disabled
                                 value={field.state.value}
                                 onBlur={field.handleBlur}
                                 onChange={(e) => field.handleChange(e.target.value)}

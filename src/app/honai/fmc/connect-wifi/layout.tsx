@@ -2,7 +2,7 @@ import { Metadata } from "next"
 import RevenueGrossPage from "./page"
 
 export const metadata: Metadata = {
-    title: 'Line In Service 2025 | Honai PUMA'
+    title: 'WL Connect Wifi 2025 | Honai PUMA'
 }
 
 const Layout = () => {
