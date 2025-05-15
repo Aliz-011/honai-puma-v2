@@ -83,3 +83,28 @@ export interface BranchEntity extends RevenueBaseFMC {
 export interface RegionEntity extends RevenueBaseFMC {
     branches: BranchEntity[];
 }
+
+export interface CurrYtDRevenue {
+    region: string;
+    branch: string;
+    subbranch: string;
+    cluster: string;
+    kabupaten: string;
+    currYtdKabupatenRev: number;
+    currYtdClusterRev: number
+    currYtdSubbranchRev: number
+    currYtdBranchRev: number
+    currYtdRegionalRev: number
+}
+export interface PrevYtDRevenue {
+    region: string;
+    branch: string;
+    subbranch: string;
+    cluster: string;
+    kabupaten: string;
+    prevYtdKabupatenRev: number;
+    prevYtdClusterRev: number
+    prevYtdSubbranchRev: number
+    prevYtdBranchRev: number
+    prevYtdRegionalRev: number
+}

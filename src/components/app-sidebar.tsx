@@ -41,7 +41,7 @@ const data = {
                 },
                 {
                     title: "Revenue ByU",
-                    url: "#",
+                    url: "/honai/revenue-byu",
                 },
                 {
                     title: "Revenue Gross Prabayar",
@@ -56,7 +56,7 @@ const data = {
             items: [
                 {
                     title: "SO All",
-                    url: "#",
+                    url: "/honai/target-so",
                 }
             ],
         },
@@ -82,11 +82,11 @@ const data = {
             items: [
                 {
                     title: "Paying Subs All",
-                    url: "#",
+                    url: "/honai/paying-subs",
                 },
                 {
                     title: "Paying LoS 0-1 All",
-                    url: "#",
+                    url: "/honai/paying-los",
                 }
             ],
         },

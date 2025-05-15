@@ -1,7 +1,13 @@
-import LoginPage from "./page"
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
+
+import LoginPage from "./page"
+import { auth } from "@/lib/auth"
+import { Metadata } from "next"
+
+export const metadata: Metadata = {
+    title: 'Login | Honai PUMA'
+}
 
 const AuthLayout = async () => {
     const session = await auth.api.getSession({

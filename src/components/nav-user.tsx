@@ -1,6 +1,6 @@
 'use client'
 
-import { useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
     LogOutIcon,
     MoreVerticalIcon,
@@ -28,15 +28,27 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar"
 
-import { authClient } from '@/lib/auth-client'
 import { useCurrentSession } from "@/hooks/use-current-session"
 import { useRouter } from "next/navigation"
+import { client } from "@/lib/client"
 
 export function NavUser() {
     const { isMobile } = useSidebar()
     const navigate = useRouter()
     const { data: user } = useCurrentSession()
     const queryClient = useQueryClient()
+
+    const mutation = useMutation({
+        mutationFn: async () => {
+            const response = await client.api.signout.$post()
+
+            return await response.json()
+        },
+        onSuccess: () => {
+            navigate.push('/login')
+            queryClient.invalidateQueries({ queryKey: ['current-session'] })
+        }
+    })
 
     return (
         <SidebarMenu>
@@ -88,16 +100,18 @@ export function NavUser() {
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="cursor-pointer" onClick={async () => await authClient.signOut({
-                            fetchOptions: {
-                                onSuccess: () => {
-                                    navigate.push('/login')
-                                    queryClient.invalidateQueries({ queryKey: ['current-session'] })
-                                }
-                            }
-                        })}>
-                            <LogOutIcon />
-                            Log out
+                        <DropdownMenuItem className="cursor-pointer">
+                            <form onSubmit={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+
+                                mutation.mutate()
+                            }}>
+                                <button className="inline-flex items-center gap-1">
+                                    <LogOutIcon />
+                                    Log out
+                                </button>
+                            </form>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

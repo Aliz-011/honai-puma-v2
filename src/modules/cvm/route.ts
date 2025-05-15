@@ -4,7 +4,7 @@ import { zValidator } from "@/lib/validator-wrapper";
 import { Hono } from "hono";
 import { z } from "zod"
 
-import { revenueCVM } from "@/db/schema/v_honai_puma";
+import { dynamicRevenueCVM } from "@/db/schema/v_honai_puma";
 import { db } from "@/db";
 import { Regional } from "@/types";
 
@@ -15,6 +15,10 @@ const app = new Hono()
             const selectedDate = date ? new Date(date) : subDays(new Date(), 3)
 
             const trxDate = format(selectedDate, 'yyyy-MM-dd')
+            const currMonth = format(selectedDate, 'MM')
+            const currYear = format(selectedDate, 'yyyy')
+
+            const revenueCVM = dynamicRevenueCVM(currYear, currMonth)
 
             const revenue = db
                 .select()

@@ -1,5 +1,9 @@
 import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
+import { InferRequestType, InferResponseType } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { authClient } from "@/lib/auth-client";
@@ -14,8 +18,10 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card"
-import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { client } from "@/lib/client";
+
+type ResponseType = InferResponseType<typeof client.api.signin.$post>
+type RequestType = InferRequestType<typeof client.api.signin.$post>['json']
 
 export default function SignInForm({
 	onSwitchToSignUp,
@@ -26,29 +32,30 @@ export default function SignInForm({
 	const queryClient = useQueryClient()
 	const { isPending } = authClient.useSession();
 
+	const mutation = useMutation<ResponseType, HTTPException, RequestType>({
+		mutationFn: async (values) => {
+			const response = await client.api.signin.$post({ json: values })
+
+			return await response.json()
+		},
+		onSuccess: () => {
+			navigate.push('/honai');
+			toast.success("Sign in successful");
+			navigate.refresh()
+			queryClient.invalidateQueries({ queryKey: ['current-session'] })
+		},
+		onError: (error) => {
+			toast.error(error.message || 'Failed, please try again.');
+		},
+	})
+
 	const form = useForm({
 		defaultValues: {
 			username: "",
 			password: "",
 		},
 		onSubmit: async ({ value }) => {
-			await authClient.signIn.username(
-				{
-					username: value.username,
-					password: value.password,
-				},
-				{
-					onSuccess: () => {
-						navigate.push('/honai');
-						toast.success("Sign in successful");
-						navigate.refresh()
-						queryClient.invalidateQueries({ queryKey: ['current-session'] })
-					},
-					onError: (error) => {
-						toast.error(error.error.message);
-					},
-				},
-			);
+			await mutation.mutateAsync(value)
 		},
 		validators: {
 			onSubmit: z.object({

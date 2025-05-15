@@ -4,7 +4,7 @@ import { zValidator } from "@/lib/validator-wrapper";
 import { Hono } from "hono";
 import { z } from "zod"
 
-import { revenueNewSales, revenueNewSalesPrabayar, trxNewSales, trxNewSalesPrabayar } from "@/db/schema/v_honai_puma";
+import { dynamicRevenueNewSales, dynamicRevenueNewSalesPrabayar, dynamicTrxNewSales, dynamicTrxNewSalesPrabayar } from "@/db/schema/v_honai_puma";
 import { db } from "@/db";
 import { Regional } from "@/types";
 
@@ -16,6 +16,10 @@ const app = new Hono()
             const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
 
             const trxDate = format(selectedDate, 'yyyy-MM-dd')
+            const currMonth = format(selectedDate, 'MM')
+            const currYear = format(selectedDate, 'yyyy')
+
+            const revenueNewSales = dynamicRevenueNewSales(currYear, currMonth)
 
             const revenueCVM = db
                 .select()
@@ -120,6 +124,10 @@ const app = new Hono()
             const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
 
             const trxDate = format(selectedDate, 'yyyy-MM-dd')
+            const currMonth = format(selectedDate, 'MM')
+            const currYear = format(selectedDate, 'yyyy')
+
+            const revenueNewSalesPrabayar = dynamicRevenueNewSalesPrabayar(currYear, currMonth)
 
             const revenueCVM = db
                 .select()
@@ -224,6 +232,10 @@ const app = new Hono()
             const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
 
             const trxDate = format(selectedDate, 'yyyy-MM-dd')
+            const currMonth = format(selectedDate, 'MM')
+            const currYear = format(selectedDate, 'yyyy')
+
+            const trxNewSales = dynamicTrxNewSales(currYear, currMonth)
 
             const revenueCVM = db
                 .select()
@@ -328,6 +340,10 @@ const app = new Hono()
             const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
 
             const trxDate = format(selectedDate, 'yyyy-MM-dd')
+            const currMonth = format(selectedDate, 'MM')
+            const currYear = format(selectedDate, 'yyyy')
+
+            const trxNewSalesPrabayar = dynamicTrxNewSalesPrabayar(currYear, currMonth)
 
             const revenueCVM = db
                 .select()

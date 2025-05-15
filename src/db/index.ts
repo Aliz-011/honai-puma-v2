@@ -6,6 +6,7 @@ import * as schema2 from './schema/puma_2025';
 import * as schema3 from './schema/household';
 import * as schema4 from './schema/multidim';
 import * as schema5 from './schema/zz_wisnu';
+import * as schema6 from './schema/digipos_revamp'
 import * as authSchema from './schema/auth'
 
 const authConnection = mysql.createPool({
@@ -50,9 +51,17 @@ const poolConnection5 = mysql.createPool({
     database: 'zz_wisnu',
 })
 
+const poolConnection6 = mysql.createPool({
+    host: process.env.DB_HOST2,
+    user: process.env.DB_USERNAME2,
+    password: process.env.DB_PASSWORD2,
+    database: 'digipos_revamp',
+})
+
 export const dbAuth = drizzle({ client: authConnection, mode: 'default', schema: authSchema });
 export const db = drizzle({ client: poolConnection, mode: 'default', schema })
 export const db2 = drizzle({ client: poolConnection2, mode: 'default', schema: schema2 })
 export const db3 = drizzle({ client: poolConnection3, mode: 'default', schema: schema3 })
 export const db4 = drizzle({ client: poolConnection4, mode: 'default', schema: schema4 })
 export const db5 = drizzle({ client: poolConnection5, mode: 'default', schema: schema5 })
+export const db6 = drizzle({ client: poolConnection6, mode: 'default', schema: schema6 })

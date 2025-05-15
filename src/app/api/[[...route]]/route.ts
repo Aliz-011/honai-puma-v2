@@ -5,6 +5,8 @@ import { logger } from "hono/logger";
 import { csrf } from 'hono/csrf'
 import { zValidator } from "@/lib/validator-wrapper";
 import { z } from 'zod'
+import { eq } from "drizzle-orm";
+import { HTTPException } from "hono/http-exception";
 
 import fmc from "@/modules/fmc/route"
 import revenueGross from "@/modules/revenue-gross/route"
@@ -12,11 +14,13 @@ import newSales from "@/modules/new-sales/route"
 import cvm from "@/modules/cvm/route"
 import redeemPv from "@/modules/redeem-pv/route"
 import areas from "@/modules/areas/route"
-import { HTTPException } from "hono/http-exception";
+import sa from '@/modules/sa/route'
+import so from '@/modules/so/route'
+import payingSubs from '@/modules/paying-subs/route'
+
 import { auth } from "@/lib/auth";
 import { dbAuth } from "@/db";
 import { accounts, users } from "@/db/schema/auth";
-import { eq } from "drizzle-orm";
 
 const app = new Hono<{
     Variables: {
@@ -66,7 +70,7 @@ const routes = app
     .post('/signin',
         zValidator('json', z.object({
             username: z.string().trim().min(1, 'Please enter your username'),
-            password: z.string().min(6, "Password must be at least 6 characters"),
+            password: z.string().min(1, "Please enter your password"),
         })),
         async c => {
             const { password, username } = c.req.valid('json')
@@ -216,6 +220,9 @@ const routes = app
     .route('/', newSales)
     .route('/', cvm)
     .route('/', redeemPv)
+    .route('/', sa)
+    .route('/', so)
+    .route('/', payingSubs)
 
 export const GET = handle(app);
 export const POST = handle(app)
