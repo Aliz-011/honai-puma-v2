@@ -2563,7 +2563,7 @@ const app = new Hono()
                 .where(and(
                     and(
                         not(eq(currRevSA.kabupaten, 'TMP')),
-                        not(eq(currRevSA.brand, 'ByU'))
+                        notInArray(currRevSA.brand, ['ByU', 'byu'])
                     ),
                     and(
                         inArray(currRevSA.regional, ['MALUKU DAN PAPUA', 'PUMA']),
@@ -4352,7 +4352,7 @@ const app = new Hono()
                 .where(and(
                     and(
                         notInArray(currRevSA.kabupaten, ['TMP']),
-                        eq(currRevSA.brand, 'byu')
+                        inArray(currRevSA.brand, ['byu', 'ByU'])
                     ),
                     and(
                         inArray(currRevSA.regional, ['MALUKU DAN PAPUA', 'PUMA']),
@@ -4588,7 +4588,7 @@ const app = new Hono()
                 .where(and(
                     and(
                         notInArray(prevMonthRevSA.kabupaten, ['TMP']),
-                        eq(prevMonthRevSA.brand, 'byu')
+                        inArray(prevMonthRevSA.brand, ['byu', 'ByU'])
                     ),
                     and(
                         inArray(prevMonthRevSA.regional, ['MALUKU DAN PAPUA', 'PUMA']),
@@ -4824,7 +4824,7 @@ const app = new Hono()
                 .where(and(
                     and(
                         notInArray(prevYearCurrMonthRevSA.kabupaten, ['TMP']),
-                        eq(prevYearCurrMonthRevSA.brand, 'byu')
+                        inArray(prevYearCurrMonthRevSA.brand, ['byu', 'ByU'])
                     ),
                     and(
                         inArray(prevYearCurrMonthRevSA.regional, ['MALUKU DAN PAPUA', 'PUMA']),
