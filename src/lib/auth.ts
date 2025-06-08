@@ -4,6 +4,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import * as schema from "@/db/schema/auth";
+import { sso } from "better-auth/plugins/sso";
 
 export const auth = betterAuth({
     database: drizzleAdapter(dbAuth, {
@@ -73,6 +74,7 @@ export const auth = betterAuth({
             minUsernameLength: 3,
             maxUsernameLength: 20
         }),
+        sso(),
         nextCookies()
     ],
 })

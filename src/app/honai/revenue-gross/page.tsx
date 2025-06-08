@@ -1,18 +1,19 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
+
 import { Filters } from '../filters'
-import { DataTable } from '../data-table'
+import { DataTable } from './data-table'
 
 import { useSelectDate } from '@/hooks/use-select-date'
-import { useQuery } from '@tanstack/react-query'
 import { client } from '@/lib/client'
 
 export default function RevenueGrossPage() {
     const { date } = useSelectDate()
     const { data, isLoading, isRefetching, refetch } = useQuery({
-        queryKey: ['revenue-gross', date],
+        queryKey: ['revenue-gross-all', date],
         queryFn: async () => {
-            const response = await client.api['revenue-gross'].$get({ query: { date: date?.toLocaleString() } })
+            const response = await client.api['revenue-gross-all'].$get({ query: { date: date?.toLocaleString() } })
 
             if (!response.ok) {
                 throw new Error('Failed to fetch data')

@@ -17,6 +17,7 @@ import areas from "@/modules/areas/route"
 import sa from '@/modules/sa/route'
 import so from '@/modules/so/route'
 import payingSubs from '@/modules/paying-subs/route'
+import IOREPS from '@/modules/household/route'
 
 import { auth } from "@/lib/auth";
 import { dbAuth } from "@/db";
@@ -223,6 +224,7 @@ const routes = app
     .route('/', sa)
     .route('/', so)
     .route('/', payingSubs)
+    .route('/', IOREPS)
 
 export const GET = handle(app);
 export const POST = handle(app)

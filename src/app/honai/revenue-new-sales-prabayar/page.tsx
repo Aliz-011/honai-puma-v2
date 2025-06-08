@@ -1,7 +1,7 @@
 'use client'
 
 import { Filters } from '../filters'
-import { DataTable } from '../data-table'
+import { DataTable } from './data-table'
 
 import { useSelectDate } from '@/hooks/use-select-date'
 import { useQuery } from '@tanstack/react-query'
@@ -12,7 +12,7 @@ export default function RevenueNewSalesPage() {
     const { data, isLoading, isRefetching, refetch } = useQuery({
         queryKey: ['revenue-new-sales-prabayar', date],
         queryFn: async () => {
-            const response = await client.api['revenue-new-sales-prabayar'].$get({ query: { date: date?.toLocaleString() } })
+            const response = await client.api['revenue-new-sales-prabayar-v2'].$get({ query: { date: date?.toLocaleString() } })
 
             if (!response.ok) {
                 throw new Error('Failed to fetch data')

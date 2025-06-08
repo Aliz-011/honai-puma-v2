@@ -1,7 +1,7 @@
 'use client'
 
 import { Filters } from '../filters'
-import { DataTable } from '../data-table'
+import { DataTable } from './data-table'
 
 import { useSelectDate } from '@/hooks/use-select-date'
 import { useQuery } from '@tanstack/react-query'
@@ -29,8 +29,8 @@ export default function RevenueSAPage() {
 
     return <div className="px-4 lg:px-6">
         <div className="overflow-hidden min-h-screen rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/[0.03] space-y-4">
-            <Filters daysBehind={2} />
-            <DataTable refetch={refetch} data={data} latestUpdatedData={2} title="Revenue SA All" date={date} isLoading={isLoading || isRefetching} />
+            <Filters daysBehind={3} />
+            <DataTable refetch={refetch} data={data} latestUpdatedData={3} title="Revenue SA All" date={date} isLoading={isLoading || isRefetching} />
         </div>
     </div>
 }

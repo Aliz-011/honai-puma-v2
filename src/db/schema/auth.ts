@@ -1,13 +1,13 @@
-import { mysqlTable, varchar, text, timestamp, boolean, int } from "drizzle-orm/mysql-core";
+import { mysqlTable, varchar, text, timestamp, boolean } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: varchar('id', { length: 36 }).primaryKey(),
   name: text('name').notNull(),
   email: varchar('email', { length: 100 }).notNull().unique(),
-  emailVerified: boolean('email_verified').notNull(),
+  emailVerified: boolean('email_verified').$defaultFn(() => false).notNull(),
   image: text('image'),
-  createdAt: timestamp('created_at').notNull(),
-  updatedAt: timestamp('updated_at').notNull(),
+  createdAt: timestamp('created_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull(),
+  updatedAt: timestamp('updated_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull(),
   username: varchar('username', { length: 100 }).unique(),
   displayUsername: text('display_username'),
   nik: varchar('nik', { length: 100 }).unique(),
@@ -46,6 +46,17 @@ export const verifications = mysqlTable("verifications", {
   identifier: text('identifier').notNull(),
   value: text('value').notNull(),
   expiresAt: timestamp('expires_at').notNull(),
-  createdAt: timestamp('created_at'),
-  updatedAt: timestamp('updated_at')
+  createdAt: timestamp('created_at').$defaultFn(() => /* @__PURE__ */ new Date()),
+  updatedAt: timestamp('updated_at').$defaultFn(() => /* @__PURE__ */ new Date())
+});
+
+export const ssoProviders = mysqlTable("sso_providers", {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  issuer: text('issuer').notNull(),
+  oidcConfig: text('oidc_config'),
+  samlConfig: text('saml_config'),
+  userId: varchar('user_id', { length: 36 }).references(() => users.id, { onDelete: 'cascade' }),
+  providerId: varchar('provider_id', { length: 100 }).notNull().unique(),
+  organizationId: text('organization_id'),
+  domain: text('domain').notNull()
 });

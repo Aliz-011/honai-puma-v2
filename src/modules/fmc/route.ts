@@ -659,8 +659,6 @@ const app = new Hono()
             const multidimDay = isCurrMonth ? format(selectedDate, 'dd') : format(closingDate, 'dd')
 
             const multidim = dynamicMultidimTable(currYear, multidimMonth, multidimDay)
-            console.log({ table: getTableName(multidim) })
-            console.log({ multidimDay, selectedDate: format(selectedDate, 'yyyy-MM-dd'), currDate })
 
             const sq1 = db5
                 .select({

@@ -1,7 +1,7 @@
 'use client'
 
 import { Filters } from '../filters'
-import { DataTable } from '../data-table'
+import { DataTable } from './data-table'
 
 import { useSelectDate } from '@/hooks/use-select-date'
 import { useQuery } from '@tanstack/react-query'

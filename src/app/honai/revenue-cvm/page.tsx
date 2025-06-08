@@ -1,7 +1,7 @@
 'use client'
 
 import { Filters } from '../filters'
-import { DataTable } from '../data-table'
+import { DataTable } from './data-table'
 
 import { useSelectDate } from '@/hooks/use-select-date'
 import { useQuery } from '@tanstack/react-query'
@@ -10,9 +10,9 @@ import { client } from '@/lib/client'
 export default function RevenueCVMPage() {
     const { date } = useSelectDate()
     const { data, isLoading, isRefetching, refetch } = useQuery({
-        queryKey: ['revenue-cvm', date],
+        queryKey: ['revenue-cvm-v2', date],
         queryFn: async () => {
-            const response = await client.api['revenue-cvm'].$get({ query: { date: date?.toLocaleString() } })
+            const response = await client.api['revenue-cvm-v2'].$get({ query: { date: date?.toLocaleString() } })
 
             if (!response.ok) {
                 throw new Error('Failed to fetch data')

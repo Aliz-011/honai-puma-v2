@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from 'zod'
-import { and, eq, gte, inArray, lte, not, sql } from "drizzle-orm";
-import { subMonths, subDays, format, subYears, endOfMonth, startOfMonth } from 'date-fns'
+import { and, between, eq, gte, inArray, lte, not, sql, sum } from "drizzle-orm";
+import { subMonths, subDays, format, subYears, endOfMonth, getDaysInMonth } from 'date-fns'
 
 import { db, db6 } from "@/db";
 import {
@@ -10,12 +10,12 @@ import {
     clusters,
     kabupatens,
     subbranches,
-    targetSO
+    targetSO,
+    territoryArea4
 } from "@/db/schema/puma_2025";
 import { zValidator } from "@/lib/validator-wrapper";
-import { dynamicRevenueSOTable } from "@/db/schema/digipos_revamp";
-import { MySqlRawQueryResult } from "drizzle-orm/mysql2";
-import { CurrYtDRevenue, PrevYtDRevenue, Regional } from "@/types";
+import { summarySoAllRegional, summarySoAllBranch, summarySoAllSubbranch, summarySoAllCluster, summarySoAllKabupaten, feiTargetPuma } from "@/db/schema/v_honai_puma";
+import { index, unionAll } from "drizzle-orm/mysql-core";
 
 const app = new Hono()
     .get('/target-so',
@@ -23,1729 +23,378 @@ const app = new Hono()
         async c => {
             const { date } = c.req.valid('query')
             const selectedDate = date ? new Date(date) : subDays(new Date(), 3)
-            const month = (selectedDate.getMonth() + 1).toString()
 
-            // KOLOM DINAMIS UNTUK MEMILIH ANTARA KOLOM `m1-m12`
-            const monthColumn = `m${month}` as keyof typeof targetSO.$inferSelect
-
-            // VARIABLE TANGGAL UNTUK IMPORT TABEL SECARA DINAMIS
-            const latestDataDate = subDays(selectedDate, 3); // - 3 days
-
-            const currMonth = format(latestDataDate, 'MM')
-            const currYear = format(latestDataDate, 'yyyy')
-            const latestMonth = parseInt(format(latestDataDate, 'M'), 10)
+            const currMonth = format(selectedDate, 'MM')
+            const currYear = format(selectedDate, 'yyyy')
+            const latestMonth = parseInt(format(selectedDate, 'M'), 10)
             const isPrevMonthLastYear = currMonth === '01'
-            const prevMonth = isPrevMonthLastYear ? '12' : format(subMonths(latestDataDate, 1), 'MM')
-            const prevMonthYear = isPrevMonthLastYear ? format(subYears(latestDataDate, 1), 'yyyy') : format(latestDataDate, 'yyyy')
-            const prevYear = format(subYears(latestDataDate, 1), 'yyyy')
-
-            // TABEL `sa_detil_`
-            const currTrxSO = dynamicRevenueSOTable(currYear, currMonth)
-            const prevMonthTrxSO = dynamicRevenueSOTable(prevMonthYear, prevMonth)
-            const prevYearCurrMonthTrxSO = dynamicRevenueSOTable(prevYear, currMonth)
-            const currYtdTrxSORev: string[] = [];
-            for (let month = 1; month <= latestMonth; month++) {
-                const monthStr = month.toString().padStart(2, '0')
-                currYtdTrxSORev.push(`so_detil_${currYear}${monthStr}`)
-            }
-            const prevYtdTrxSORev: string[] = [];
-            for (let month = 1; month <= latestMonth; month++) {
-                const monthStr = month.toString().padStart(2, '0')
-                prevYtdTrxSORev.push(`so_detil_${prevYear}${monthStr}`)
-            }
+            const prevMonth = isPrevMonthLastYear ? '12' : format(subMonths(selectedDate, 1), 'MM')
+            const prevMonthYear = isPrevMonthLastYear ? format(subYears(selectedDate, 1), 'yyyy') : format(selectedDate, 'yyyy')
+            const prevYear = format(subYears(selectedDate, 1), 'yyyy')
 
             // VARIABLE TANGGAL
             // Get the last day of the selected month
-            const lastDayOfSelectedMonth = endOfMonth(latestDataDate);
-            const isEndOfMonth = latestDataDate.getDate() === lastDayOfSelectedMonth.getDate();
+            const lastDayOfSelectedMonth = endOfMonth(selectedDate);
+            const isEndOfMonth = selectedDate.getDate() === lastDayOfSelectedMonth.getDate();
 
-            const endOfCurrMonth = isEndOfMonth ? lastDayOfSelectedMonth : latestDataDate;
-            const endOfPrevMonth = isEndOfMonth ? endOfMonth(subMonths(latestDataDate, 1)) : subMonths(latestDataDate, 1);
-            const endOfPrevYearSameMonth = isEndOfMonth ? endOfMonth(subYears(latestDataDate, 1)) : subYears(latestDataDate, 1);
+            const endOfCurrMonth = isEndOfMonth ? lastDayOfSelectedMonth : selectedDate;
+            const endOfPrevMonth = isEndOfMonth ? endOfMonth(subMonths(selectedDate, 1)) : subMonths(selectedDate, 1);
+            const endOfPrevYearSameMonth = isEndOfMonth ? endOfMonth(subYears(selectedDate, 1)) : subYears(selectedDate, 1);
 
-            // get the first day and last day of the selected month dynamically
-            const firstDayOfCurrMonth = format(startOfMonth(latestDataDate), 'yyyy-MM-dd')
-            const firstDayOfPrevMonth = format(startOfMonth(subMonths(latestDataDate, 1)), 'yyyy-MM-dd')
-            const firstDayOfPrevYearCurrMonth = format(startOfMonth(subYears(latestDataDate, 1)), 'yyyy-MM-dd')
+            const daysInMonth = getDaysInMonth(selectedDate)
+            const today = Number(format(selectedDate, 'd'))
 
             const currDate = format(endOfCurrMonth, 'yyyy-MM-dd');
             const prevDate = format(endOfPrevMonth, 'yyyy-MM-dd');
             const prevYearCurrDate = format(endOfPrevYearSameMonth, 'yyyy-MM-dd');
+            const yyyyMM = format(selectedDate, 'yyyyMM')
 
             const currJanuaryFirst = `${currYear}-01-01`
             const prevJanuaryFirst = `${prevYear}-01-01`
 
-            const sq2 = db6
+            const regionalSubquery = db
+                .select({ regional: territoryArea4.regional })
+                .from(territoryArea4)
+                .where(eq(territoryArea4.regional, 'PUMA'))
+                .groupBy(territoryArea4.regional)
+                .as('a')
+
+            const summaryRevRegional = db
                 .select({
-                    regionName: sql<string>`CASE WHEN ${currTrxSO.regionSo} IN ('MALUKU DAN PAPUA', 'PUMA') THEN 'PUMA' END`.as('regionName'),
-                    branchName: sql<string>`
-                 CASE
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'AMBON',
-                         'KOTA AMBON',
-                         'MALUKU TENGAH',
-                         'SERAM BAGIAN TIMUR',
-                         'KEPULAUAN ARU',
-                         'KOTA TUAL',
-                         'MALUKU BARAT DAYA',
-                         'MALUKU TENGGARA',
-                         'MALUKU TENGGARA BARAT',
-                         'BURU',
-                         'BURU SELATAN',
-                         'SERAM BAGIAN BARAT',
-                         'KEPULAUAN TANIMBAR'
-                     ) THEN 'AMBON'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'KOTA JAYAPURA',
-                         'JAYAPURA',
-                         'KEEROM',
-                         'MAMBERAMO RAYA',
-                         'SARMI',
-                         'BIAK',
-                         'BIAK NUMFOR',
-                         'KEPULAUAN YAPEN',
-                         'SUPIORI',
-                         'WAROPEN',
-                         'JAYAWIJAYA',
-                         'LANNY JAYA',
-                         'MAMBERAMO TENGAH',
-                         'NDUGA',
-                         'PEGUNUNGAN BINTANG',
-                         'TOLIKARA',
-                         'YAHUKIMO',
-                         'YALIMO'
-                     ) THEN 'JAYAPURA'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'MANOKWARI',
-                         'FAKFAK',
-                         'FAK FAK',
-                         'KAIMANA',
-                         'MANOKWARI SELATAN',
-                         'PEGUNUNGAN ARFAK',
-                         'TELUK BINTUNI',
-                         'TELUK WONDAMA',
-                         'KOTA SORONG',
-                         'MAYBRAT',
-                         'RAJA AMPAT',
-                         'SORONG',
-                         'SORONG SELATAN',
-                         'TAMBRAUW'
-                     ) THEN 'SORONG'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'ASMAT',
-                         'BOVEN DIGOEL',
-                         'MAPPI',
-                         'MERAUKE',
-                         'INTAN JAYA',
-                         'MIMIKA',
-                         'PUNCAK',
-                         'PUNCAK JAYA',
-                         'TIMIKA',
-                         'DEIYAI',
-                         'DOGIYAI',
-                         'NABIRE',
-                         'PANIAI'
-                     ) THEN 'TIMIKA'
-                     ELSE NULL
-                 END
-                                `.as('branchName'),
-                    subbranchName: sql<string>`
-                 CASE
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'AMBON',
-                         'KOTA AMBON',
-                         'MALUKU TENGAH',
-                         'SERAM BAGIAN TIMUR'
-                     ) THEN 'AMBON'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'KEPULAUAN ARU',
-                         'KOTA TUAL',
-                         'MALUKU BARAT DAYA',
-                         'MALUKU TENGGARA',
-                         'MALUKU TENGGARA BARAT',
-                         'KEPULAUAN TANIMBAR'
-                     ) THEN 'KEPULAUAN AMBON'
-                     WHEN ${currTrxSO.kabSo} IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BURU'
-                     WHEN ${currTrxSO.kabSo} IN ('KOTA JAYAPURA') THEN 'JAYAPURA'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'JAYAPURA',
-                         'KEEROM',
-                         'MAMBERAMO RAYA',
-                         'SARMI',
-                         'BIAK',
-                         'BIAK NUMFOR',
-                         'KEPULAUAN YAPEN',
-                         'SUPIORI',
-                         'WAROPEN',
-                         'JAYAWIJAYA',
-                         'LANNY JAYA',
-                         'MAMBERAMO TENGAH',
-                         'NDUGA',
-                         'PEGUNUNGAN BINTANG',
-                         'TOLIKARA',
-                         'YAHUKIMO',
-                         'YALIMO'
-                     ) THEN 'SENTANI'
-                     WHEN ${currTrxSO.kabSo} IN ('MANOKWARI') THEN 'MANOKWARI'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'FAKFAK',
-                         'FAK FAK',
-                         'KAIMANA',
-                         'MANOKWARI SELATAN',
-                         'PEGUNUNGAN ARFAK',
-                         'TELUK BINTUNI',
-                         'TELUK WONDAMA'
-                     ) THEN 'MANOKWARI OUTER'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'KOTA SORONG',
-                         'MAYBRAT',
-                         'RAJA AMPAT',
-                         'SORONG',
-                         'SORONG SELATAN',
-                         'TAMBRAUW'
-                     ) THEN 'SORONG RAJA AMPAT'
-                     WHEN ${currTrxSO.kabSo} IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'MERAUKE'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'INTAN JAYA',
-                         'MIMIKA',
-                         'PUNCAK',
-                         'PUNCAK JAYA',
-                         'TIMIKA'
-                     ) THEN 'MIMIKA'
-                     WHEN ${currTrxSO.kabSo} IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
-                     ELSE NULL
-                 END
-                                `.as('subbranchName'),
-                    clusterName: sql<string>`
-                 CASE
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'KOTA AMBON',
-                         'MALUKU TENGAH',
-                         'SERAM BAGIAN TIMUR'
-                     ) THEN 'AMBON'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'KEPULAUAN ARU',
-                         'KOTA TUAL',
-                         'MALUKU BARAT DAYA',
-                         'MALUKU TENGGARA',
-                         'MALUKU TENGGARA BARAT',
-                         'KEPULAUAN TANIMBAR'
-                     ) THEN 'KEPULAUAN TUAL'
-                     WHEN ${currTrxSO.kabSo} IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BARAT BURU'
-                     WHEN ${currTrxSO.kabSo} IN ('KOTA JAYAPURA') THEN 'KOTA JAYAPURA'
-                     WHEN ${currTrxSO.kabSo} IN ('JAYAPURA', 'KEEROM', 'MAMBERAMO RAYA', 'SARMI') THEN 'JAYAPURA OUTER'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'BIAK',
-                         'BIAK NUMFOR',
-                         'KEPULAUAN YAPEN',
-                         'SUPIORI',
-                         'WAROPEN'
-                     ) THEN 'NEW BIAK NUMFOR'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'JAYAWIJAYA',
-                         'LANNY JAYA',
-                         'MAMBERAMO TENGAH',
-                         'NDUGA',
-                         'PEGUNUNGAN BINTANG',
-                         'TOLIKARA',
-                         'YAHUKIMO',
-                         'YALIMO'
-                     ) THEN 'PAPUA PEGUNUNGAN'
-                     WHEN ${currTrxSO.kabSo} IN ('MANOKWARI') THEN 'MANOKWARI'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'FAKFAK',
-                         'FAK FAK',
-                         'KAIMANA',
-                         'MANOKWARI SELATAN',
-                         'PEGUNUNGAN ARFAK',
-                         'TELUK BINTUNI',
-                         'TELUK WONDAMA'
-                     ) THEN 'MANOKWARI OUTER'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'KOTA SORONG',
-                         'MAYBRAT',
-                         'RAJA AMPAT',
-                         'SORONG',
-                         'SORONG SELATAN',
-                         'TAMBRAUW'
-                     ) THEN 'NEW SORONG RAJA AMPAT'
-                     WHEN ${currTrxSO.kabSo} IN (
-                         'INTAN JAYA',
-                         'MIMIKA',
-                         'PUNCAK',
-                         'PUNCAK JAYA',
-                         'TIMIKA'
-                     ) THEN 'MIMIKA PUNCAK'
-                     WHEN ${currTrxSO.kabSo} IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
-                     WHEN ${currTrxSO.kabSo} IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'NEW MERAUKE'
-                     ELSE NULL
-                 END
-                                `.as('clusterName'),
-                    kabupaten: currTrxSO.kabSo,
-                    trx: sql<number>`COUNT(${currTrxSO.so})`.as('trx')
+                    regional: summarySoAllRegional.regional,
+                    trx_total_mom: summarySoAllRegional.trx_total_mom,
+                    trx_all_m: sql<number>`SUM(CASE WHEN ${summarySoAllRegional.tgl} = ${currDate} THEN ${summarySoAllRegional.trx_all_m} ELSE 0 END)`.as('trx_all_m'),
+                    trx_all_m1: sql<number>`SUM(CASE WHEN ${summarySoAllRegional.tgl} = ${prevDate} THEN ${summarySoAllRegional.trx_all_m} ELSE 0 END)`.as('trx_all_m1'),
+                    trx_all_m12: sql<number>`SUM(CASE WHEN ${summarySoAllRegional.tgl} = ${prevYearCurrDate} THEN ${summarySoAllRegional.trx_all_m} ELSE 0 END)`.as('trx_all_m12'),
+                    trx_all_ytd: sql<number>`SUM(CASE WHEN ${summarySoAllRegional.tgl} BETWEEN ${currJanuaryFirst} AND ${currDate} THEN ${summarySoAllRegional.trx_all_m} ELSE 0 END)`.as('trx_all_ytd'),
+                    trx_all_ytd1: sql<number>`SUM(CASE WHEN ${summarySoAllRegional.tgl} BETWEEN ${prevJanuaryFirst} AND ${prevYearCurrDate} THEN ${summarySoAllRegional.trx_all_m} ELSE 0 END)`.as('trx_all_ytd1'),
                 })
-                .from(currTrxSO)
-                .where(and(
-                    not(eq(currTrxSO.kabSo, 'TMP')),
-                    and(
-                        inArray(currTrxSO.regionSo, ['MALUKU DAN PAPUA', 'PUMA']),
-                        and(
-                            gte(currTrxSO.dateSo, firstDayOfCurrMonth),
-                            lte(currTrxSO.dateSo, currDate)
-                        )
-                    )
-                ))
-                .groupBy(sql`1,2,3,4,5`)
-                .as('sq2')
+                .from(summarySoAllRegional, {
+                    useIndex: [
+                        index('tgl').on(summarySoAllRegional.tgl),
+                        index('regional').on(summarySoAllRegional.regional)
+                    ]
+                })
+                .where(eq(summarySoAllRegional.regional, 'PUMA'))
+                .groupBy(summarySoAllRegional.regional)
+                .as('b')
 
-            const sq3 = db6
+            const regionalTargetRevenue = db
                 .select({
-                    regionName: sql<string>`CASE WHEN ${prevMonthTrxSO.regionSo} IN ('MALUKU DAN PAPUA', 'PUMA') THEN 'PUMA' END`.as('regionName'),
-                    branchName: sql<string>`
-                 CASE
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'AMBON',
-                         'KOTA AMBON',
-                         'MALUKU TENGAH',
-                         'SERAM BAGIAN TIMUR',
-                         'KEPULAUAN ARU',
-                         'KOTA TUAL',
-                         'MALUKU BARAT DAYA',
-                         'MALUKU TENGGARA',
-                         'MALUKU TENGGARA BARAT',
-                         'BURU',
-                         'BURU SELATAN',
-                         'SERAM BAGIAN BARAT',
-                         'KEPULAUAN TANIMBAR'
-                     ) THEN 'AMBON'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'KOTA JAYAPURA',
-                         'JAYAPURA',
-                         'KEEROM',
-                         'MAMBERAMO RAYA',
-                         'SARMI',
-                         'BIAK',
-                         'BIAK NUMFOR',
-                         'KEPULAUAN YAPEN',
-                         'SUPIORI',
-                         'WAROPEN',
-                         'JAYAWIJAYA',
-                         'LANNY JAYA',
-                         'MAMBERAMO TENGAH',
-                         'NDUGA',
-                         'PEGUNUNGAN BINTANG',
-                         'TOLIKARA',
-                         'YAHUKIMO',
-                         'YALIMO'
-                     ) THEN 'JAYAPURA'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'MANOKWARI',
-                         'FAKFAK',
-                         'FAK FAK',
-                         'KAIMANA',
-                         'MANOKWARI SELATAN',
-                         'PEGUNUNGAN ARFAK',
-                         'TELUK BINTUNI',
-                         'TELUK WONDAMA',
-                         'KOTA SORONG',
-                         'MAYBRAT',
-                         'RAJA AMPAT',
-                         'SORONG',
-                         'SORONG SELATAN',
-                         'TAMBRAUW'
-                     ) THEN 'SORONG'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'ASMAT',
-                         'BOVEN DIGOEL',
-                         'MAPPI',
-                         'MERAUKE',
-                         'INTAN JAYA',
-                         'MIMIKA',
-                         'PUNCAK',
-                         'PUNCAK JAYA',
-                         'TIMIKA',
-                         'DEIYAI',
-                         'DOGIYAI',
-                         'NABIRE',
-                         'PANIAI'
-                     ) THEN 'TIMIKA'
-                     ELSE NULL
-                 END
-                                `.as('branchName'),
-                    subbranchName: sql<string>`
-                 CASE
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'AMBON',
-                         'KOTA AMBON',
-                         'MALUKU TENGAH',
-                         'SERAM BAGIAN TIMUR'
-                     ) THEN 'AMBON'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'KEPULAUAN ARU',
-                         'KOTA TUAL',
-                         'MALUKU BARAT DAYA',
-                         'MALUKU TENGGARA',
-                         'MALUKU TENGGARA BARAT',
-                         'KEPULAUAN TANIMBAR'
-                     ) THEN 'KEPULAUAN AMBON'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BURU'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('KOTA JAYAPURA') THEN 'JAYAPURA'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'JAYAPURA',
-                         'KEEROM',
-                         'MAMBERAMO RAYA',
-                         'SARMI',
-                         'BIAK',
-                         'BIAK NUMFOR',
-                         'KEPULAUAN YAPEN',
-                         'SUPIORI',
-                         'WAROPEN',
-                         'JAYAWIJAYA',
-                         'LANNY JAYA',
-                         'MAMBERAMO TENGAH',
-                         'NDUGA',
-                         'PEGUNUNGAN BINTANG',
-                         'TOLIKARA',
-                         'YAHUKIMO',
-                         'YALIMO'
-                     ) THEN 'SENTANI'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('MANOKWARI') THEN 'MANOKWARI'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'FAKFAK',
-                         'FAK FAK',
-                         'KAIMANA',
-                         'MANOKWARI SELATAN',
-                         'PEGUNUNGAN ARFAK',
-                         'TELUK BINTUNI',
-                         'TELUK WONDAMA'
-                     ) THEN 'MANOKWARI OUTER'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'KOTA SORONG',
-                         'MAYBRAT',
-                         'RAJA AMPAT',
-                         'SORONG',
-                         'SORONG SELATAN',
-                         'TAMBRAUW'
-                     ) THEN 'SORONG RAJA AMPAT'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'MERAUKE'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'INTAN JAYA',
-                         'MIMIKA',
-                         'PUNCAK',
-                         'PUNCAK JAYA',
-                         'TIMIKA'
-                     ) THEN 'MIMIKA'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
-                     ELSE NULL
-                 END
-                                `.as('subbranchName'),
-                    clusterName: sql<string>`
-                 CASE
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'KOTA AMBON',
-                         'MALUKU TENGAH',
-                         'SERAM BAGIAN TIMUR'
-                     ) THEN 'AMBON'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'KEPULAUAN ARU',
-                         'KOTA TUAL',
-                         'MALUKU BARAT DAYA',
-                         'MALUKU TENGGARA',
-                         'MALUKU TENGGARA BARAT',
-                         'KEPULAUAN TANIMBAR'
-                     ) THEN 'KEPULAUAN TUAL'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BARAT BURU'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('KOTA JAYAPURA') THEN 'KOTA JAYAPURA'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('JAYAPURA', 'KEEROM', 'MAMBERAMO RAYA', 'SARMI') THEN 'JAYAPURA OUTER'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'BIAK',
-                         'BIAK NUMFOR',
-                         'KEPULAUAN YAPEN',
-                         'SUPIORI',
-                         'WAROPEN'
-                     ) THEN 'NEW BIAK NUMFOR'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'JAYAWIJAYA',
-                         'LANNY JAYA',
-                         'MAMBERAMO TENGAH',
-                         'NDUGA',
-                         'PEGUNUNGAN BINTANG',
-                         'TOLIKARA',
-                         'YAHUKIMO',
-                         'YALIMO'
-                     ) THEN 'PAPUA PEGUNUNGAN'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('MANOKWARI') THEN 'MANOKWARI'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'FAKFAK',
-                         'FAK FAK',
-                         'KAIMANA',
-                         'MANOKWARI SELATAN',
-                         'PEGUNUNGAN ARFAK',
-                         'TELUK BINTUNI',
-                         'TELUK WONDAMA'
-                     ) THEN 'MANOKWARI OUTER'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'KOTA SORONG',
-                         'MAYBRAT',
-                         'RAJA AMPAT',
-                         'SORONG',
-                         'SORONG SELATAN',
-                         'TAMBRAUW'
-                     ) THEN 'NEW SORONG RAJA AMPAT'
-                     WHEN ${prevMonthTrxSO.kabSo} IN (
-                         'INTAN JAYA',
-                         'MIMIKA',
-                         'PUNCAK',
-                         'PUNCAK JAYA',
-                         'TIMIKA'
-                     ) THEN 'MIMIKA PUNCAK'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
-                     WHEN ${prevMonthTrxSO.kabSo} IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'NEW MERAUKE'
-                     ELSE NULL
-                 END
-                                `.as('clusterName'),
-                    kabupaten: prevMonthTrxSO.kabSo,
-                    trx: sql<number>`COUNT(${prevMonthTrxSO.so})`.as('trx')
+                    regional: territoryArea4.regional,
+                    target_so: sum(feiTargetPuma.so).as('target_so')
                 })
-                .from(prevMonthTrxSO)
-                .where(and(
-                    not(eq(prevMonthTrxSO.kabSo, 'TMP')),
-                    and(
-                        inArray(prevMonthTrxSO.regionSo, ['MALUKU DAN PAPUA', 'PUMA']),
-                        and(
-                            gte(prevMonthTrxSO.dateSo, firstDayOfPrevMonth),
-                            lte(prevMonthTrxSO.dateSo, prevDate)
-                        )
-                    )
-                ))
-                .groupBy(sql`1,2,3,4,5`)
-                .as('sq3')
+                .from(feiTargetPuma)
+                .rightJoin(territoryArea4, eq(feiTargetPuma.territory, territoryArea4.kabupaten))
+                .where(eq(feiTargetPuma.periode, yyyyMM))
+                .groupBy(territoryArea4.regional)
+                .as('c')
 
-            const sq4 = db6
+            const revenueRegional = db
                 .select({
-                    regionName: sql<string>`CASE WHEN ${prevYearCurrMonthTrxSO.regionSo} IN ('MALUKU DAN PAPUA', 'PUMA') THEN 'PUMA' END`.as('regionName'),
-                    branchName: sql<string>`
-                 CASE
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'AMBON',
-                         'KOTA AMBON',
-                         'MALUKU TENGAH',
-                         'SERAM BAGIAN TIMUR',
-                         'KEPULAUAN ARU',
-                         'KOTA TUAL',
-                         'MALUKU BARAT DAYA',
-                         'MALUKU TENGGARA',
-                         'MALUKU TENGGARA BARAT',
-                         'BURU',
-                         'BURU SELATAN',
-                         'SERAM BAGIAN BARAT',
-                         'KEPULAUAN TANIMBAR'
-                     ) THEN 'AMBON'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'KOTA JAYAPURA',
-                         'JAYAPURA',
-                         'KEEROM',
-                         'MAMBERAMO RAYA',
-                         'SARMI',
-                         'BIAK',
-                         'BIAK NUMFOR',
-                         'KEPULAUAN YAPEN',
-                         'SUPIORI',
-                         'WAROPEN',
-                         'JAYAWIJAYA',
-                         'LANNY JAYA',
-                         'MAMBERAMO TENGAH',
-                         'NDUGA',
-                         'PEGUNUNGAN BINTANG',
-                         'TOLIKARA',
-                         'YAHUKIMO',
-                         'YALIMO'
-                     ) THEN 'JAYAPURA'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'MANOKWARI',
-                         'FAKFAK',
-                         'FAK FAK',
-                         'KAIMANA',
-                         'MANOKWARI SELATAN',
-                         'PEGUNUNGAN ARFAK',
-                         'TELUK BINTUNI',
-                         'TELUK WONDAMA',
-                         'KOTA SORONG',
-                         'MAYBRAT',
-                         'RAJA AMPAT',
-                         'SORONG',
-                         'SORONG SELATAN',
-                         'TAMBRAUW'
-                     ) THEN 'SORONG'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'ASMAT',
-                         'BOVEN DIGOEL',
-                         'MAPPI',
-                         'MERAUKE',
-                         'INTAN JAYA',
-                         'MIMIKA',
-                         'PUNCAK',
-                         'PUNCAK JAYA',
-                         'TIMIKA',
-                         'DEIYAI',
-                         'DOGIYAI',
-                         'NABIRE',
-                         'PANIAI'
-                     ) THEN 'TIMIKA'
-                     ELSE NULL
-                 END
-                                `.as('branchName'),
-                    subbranchName: sql<string>`
-                 CASE
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'AMBON',
-                         'KOTA AMBON',
-                         'MALUKU TENGAH',
-                         'SERAM BAGIAN TIMUR'
-                     ) THEN 'AMBON'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'KEPULAUAN ARU',
-                         'KOTA TUAL',
-                         'MALUKU BARAT DAYA',
-                         'MALUKU TENGGARA',
-                         'MALUKU TENGGARA BARAT',
-                         'KEPULAUAN TANIMBAR'
-                     ) THEN 'KEPULAUAN AMBON'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BURU'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('KOTA JAYAPURA') THEN 'JAYAPURA'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'JAYAPURA',
-                         'KEEROM',
-                         'MAMBERAMO RAYA',
-                         'SARMI',
-                         'BIAK',
-                         'BIAK NUMFOR',
-                         'KEPULAUAN YAPEN',
-                         'SUPIORI',
-                         'WAROPEN',
-                         'JAYAWIJAYA',
-                         'LANNY JAYA',
-                         'MAMBERAMO TENGAH',
-                         'NDUGA',
-                         'PEGUNUNGAN BINTANG',
-                         'TOLIKARA',
-                         'YAHUKIMO',
-                         'YALIMO'
-                     ) THEN 'SENTANI'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('MANOKWARI') THEN 'MANOKWARI'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'FAKFAK',
-                         'FAK FAK',
-                         'KAIMANA',
-                         'MANOKWARI SELATAN',
-                         'PEGUNUNGAN ARFAK',
-                         'TELUK BINTUNI',
-                         'TELUK WONDAMA'
-                     ) THEN 'MANOKWARI OUTER'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'KOTA SORONG',
-                         'MAYBRAT',
-                         'RAJA AMPAT',
-                         'SORONG',
-                         'SORONG SELATAN',
-                         'TAMBRAUW'
-                     ) THEN 'SORONG RAJA AMPAT'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'MERAUKE'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'INTAN JAYA',
-                         'MIMIKA',
-                         'PUNCAK',
-                         'PUNCAK JAYA',
-                         'TIMIKA'
-                     ) THEN 'MIMIKA'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
-                     ELSE NULL
-                 END
-                                `.as('subbranchName'),
-                    clusterName: sql<string>`
-                 CASE
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'KOTA AMBON',
-                         'MALUKU TENGAH',
-                         'SERAM BAGIAN TIMUR'
-                     ) THEN 'AMBON'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'KEPULAUAN ARU',
-                         'KOTA TUAL',
-                         'MALUKU BARAT DAYA',
-                         'MALUKU TENGGARA',
-                         'MALUKU TENGGARA BARAT',
-                         'KEPULAUAN TANIMBAR'
-                     ) THEN 'KEPULAUAN TUAL'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BARAT BURU'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('KOTA JAYAPURA') THEN 'KOTA JAYAPURA'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('JAYAPURA', 'KEEROM', 'MAMBERAMO RAYA', 'SARMI') THEN 'JAYAPURA OUTER'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'BIAK',
-                         'BIAK NUMFOR',
-                         'KEPULAUAN YAPEN',
-                         'SUPIORI',
-                         'WAROPEN'
-                     ) THEN 'NEW BIAK NUMFOR'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'JAYAWIJAYA',
-                         'LANNY JAYA',
-                         'MAMBERAMO TENGAH',
-                         'NDUGA',
-                         'PEGUNUNGAN BINTANG',
-                         'TOLIKARA',
-                         'YAHUKIMO',
-                         'YALIMO'
-                     ) THEN 'PAPUA PEGUNUNGAN'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('MANOKWARI') THEN 'MANOKWARI'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'FAKFAK',
-                         'FAK FAK',
-                         'KAIMANA',
-                         'MANOKWARI SELATAN',
-                         'PEGUNUNGAN ARFAK',
-                         'TELUK BINTUNI',
-                         'TELUK WONDAMA'
-                     ) THEN 'MANOKWARI OUTER'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'KOTA SORONG',
-                         'MAYBRAT',
-                         'RAJA AMPAT',
-                         'SORONG',
-                         'SORONG SELATAN',
-                         'TAMBRAUW'
-                     ) THEN 'NEW SORONG RAJA AMPAT'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN (
-                         'INTAN JAYA',
-                         'MIMIKA',
-                         'PUNCAK',
-                         'PUNCAK JAYA',
-                         'TIMIKA'
-                     ) THEN 'MIMIKA PUNCAK'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
-                     WHEN ${prevYearCurrMonthTrxSO.kabSo} IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'NEW MERAUKE'
-                     ELSE NULL
-                 END
-                                `.as('clusterName'),
-                    kabupaten: prevYearCurrMonthTrxSO.kabSo,
-                    trx: sql<number>`COUNT(${prevYearCurrMonthTrxSO.so})`.as('trx')
+                    name: regionalSubquery.regional,
+                    target_so: sql<number>`ROUND(SUM(${regionalTargetRevenue.target_so}),2)`.as('target_so'),
+                    so: sql<number>`ROUND(SUM(${summaryRevRegional.trx_all_m}),2)`.as('so'),
+                    ach_target_fm_so: sql<string>`CONCAT(ROUND((SUM(${summaryRevRegional.trx_all_m})/SUM(${regionalTargetRevenue.target_so}))*100,2),'%')`.as('ach_target_fm_so'),
+                    drr_so: sql<string>`CONCAT(ROUND((SUM(${summaryRevRegional.trx_all_m})/(${today}/${daysInMonth}*(SUM(${regionalTargetRevenue.target_so}))))*100,2),'%')`.as('drr_so'),
+                    gap_to_target_so: sql<number>`ROUND((COALESCE(SUM(${summaryRevRegional.trx_all_m}) - SUM(${regionalTargetRevenue.target_so}),0)),2)`.as('gap_to_target_so'),
+                    mom_so: sql<string>`CONCAT(${summaryRevRegional.trx_total_mom}, '%')`.as('mom_so'),
+                    so_absolut: sql<number>`ROUND(SUM(${summaryRevRegional.trx_all_m} - ${summaryRevRegional.trx_all_m1}),2)`.as('so_absolut'),
+                    yoy_so: sql<string>`CONCAT(SUM(${summaryRevRegional.trx_all_m} - ${summaryRevRegional.trx_all_m12})/${summaryRevRegional.trx_all_m12}*100, '%')`.as('yoy_so'),
+                    ytd_so: sql<string>`CONCAT(SUM(${summaryRevRegional.trx_all_ytd} - ${summaryRevRegional.trx_all_ytd1})/${summaryRevRegional.trx_all_ytd1}*100, '%')`.as('ytd_so')
                 })
-                .from(prevYearCurrMonthTrxSO)
-                .where(and(
-                    not(eq(prevYearCurrMonthTrxSO.kabSo, 'TMP')),
-                    and(
-                        inArray(prevYearCurrMonthTrxSO.regionSo, ['MALUKU DAN PAPUA', 'PUMA']),
-                        and(
-                            gte(prevYearCurrMonthTrxSO.dateSo, firstDayOfPrevYearCurrMonth),
-                            lte(prevYearCurrMonthTrxSO.dateSo, prevYearCurrDate)
-                        )
-                    )
-                ))
-                .groupBy(sql`1,2,3,4,5`)
-                .as('sq4')
+                .from(regionalSubquery)
+                .leftJoin(summaryRevRegional, eq(regionalSubquery.regional, summaryRevRegional.regional))
+                .leftJoin(regionalTargetRevenue, eq(regionalSubquery.regional, regionalTargetRevenue.regional))
+                .groupBy(regionalSubquery.regional)
 
-            // QUERY UNTUK TARGET BULAN INI
-            const p1 = db
+            const branchHeaderQuery = db
+                .selectDistinct({
+                    name: sql<string | null>`'BRANCH'`,
+                    target_so: sql<number>`''`,
+                    so: sql<number>`''`,
+                    ach_target_fm_so: sql<string>`''`,
+                    drr_so: sql<string>`''`,
+                    gap_to_target_so: sql<number>`''`,
+                    mom_so: sql<string>`''`,
+                    so_absolut: sql<number>`''`,
+                    yoy_so: sql<string>`''`,
+                    ytd_so: sql<string>`''`,
+                })
+                .from(feiTargetPuma)
+
+            const branchSubquery = db
+                .select({ branch: territoryArea4.branch })
+                .from(territoryArea4)
+                .where(eq(territoryArea4.regional, 'PUMA'))
+                .groupBy(territoryArea4.branch)
+                .as('a')
+
+            const summaryRevBranch = db
                 .select({
-                    id: regionals.id,
-                    region: regionals.regional,
-                    branch: branches.branchNew,
-                    subbranch: subbranches.subbranchNew,
-                    cluster: clusters.cluster,
-                    kabupaten: kabupatens.kabupaten,
-                    currMonthTargetRev: sql<number>`SUM(${targetSO[monthColumn]})`.as('currMonthTargetRev')
+                    branch: summarySoAllBranch.branch,
+                    trx_total_mom: summarySoAllBranch.trx_total_mom,
+                    trx_all_m: sql<number>`SUM(CASE WHEN ${summarySoAllBranch.tgl} = ${currDate} THEN ${summarySoAllBranch.trx_all_m} ELSE 0 END)`.as('trx_all_m'),
+                    trx_all_m1: sql<number>`SUM(CASE WHEN ${summarySoAllBranch.tgl} = ${prevDate} THEN ${summarySoAllBranch.trx_all_m} ELSE 0 END)`.as('trx_all_m1'),
+                    trx_all_m12: sql<number>`SUM(CASE WHEN ${summarySoAllBranch.tgl} = ${prevYearCurrDate} THEN ${summarySoAllBranch.trx_all_m} ELSE 0 END)`.as('trx_all_m12'),
+                    trx_all_ytd: sql<number>`SUM(CASE WHEN ${summarySoAllBranch.tgl} BETWEEN ${currJanuaryFirst} AND ${currDate} THEN ${summarySoAllBranch.trx_all_m} ELSE 0 END)`.as('trx_all_ytd'),
+                    trx_all_ytd1: sql<number>`SUM(CASE WHEN ${summarySoAllBranch.tgl} BETWEEN ${prevJanuaryFirst} AND ${prevYearCurrDate} THEN ${summarySoAllBranch.trx_all_m} ELSE 0 END)`.as('trx_all_ytd1'),
                 })
-                .from(regionals)
-                .leftJoin(branches, eq(regionals.id, branches.regionalId))
-                .leftJoin(subbranches, eq(branches.id, subbranches.branchId))
-                .leftJoin(clusters, eq(subbranches.id, clusters.subbranchId))
-                .leftJoin(kabupatens, eq(clusters.id, kabupatens.clusterId))
-                .leftJoin(targetSO, eq(kabupatens.id, targetSO.kabupatenId))
-                .groupBy(
-                    regionals.regional,
-                    branches.branchNew,
-                    subbranches.subbranchNew,
-                    clusters.cluster,
-                    kabupatens.kabupaten
-                )
-                .prepare()
+                .from(summarySoAllBranch, {
+                    useIndex: [
+                        index('tgl').on(summarySoAllBranch.tgl),
+                        index('regional').on(summarySoAllBranch.regional)
+                    ]
+                })
+                .where(eq(summarySoAllBranch.regional, 'PUMA'))
+                .groupBy(summarySoAllBranch.branch)
+                .as('b')
 
-            const p2 = db6
+            const branchTargetRevenue = db
                 .select({
-                    region: sql<string>`${sq2.regionName}`.as('region'),
-                    branch: sql<string>`${sq2.branchName}`.as('branch'), // Keep only one branchName
-                    subbranch: sql<string>`${sq2.subbranchName}`.as('subbranch'),
-                    cluster: sql<string>`${sq2.clusterName}`.as('cluster'),
-                    kabupaten: sql<string>`${sq2.kabupaten}`.as('kabupaten'),
-                    currMonthKabupatenRev: sql<number>`SUM(${sq2.trx})`.as('currMonthKabupatenRev'),
-                    currMonthClusterRev: sql<number>`SUM(SUM(${sq2.trx})) OVER (PARTITION BY ${sq2.regionName}, ${sq2.branchName}, ${sq2.subbranchName}, ${sq2.clusterName})`.as('currMonthClusterRev'),
-                    currMonthSubbranchRev: sql<number>`SUM(SUM(${sq2.trx})) OVER (PARTITION BY ${sq2.regionName}, ${sq2.branchName}, ${sq2.subbranchName})`.as('currMonthSubbranchRev'),
-                    currMonthBranchRev: sql<number>`SUM(SUM(${sq2.trx})) OVER (PARTITION BY ${sq2.regionName}, ${sq2.branchName})`.as('currMonthBranchRev'),
-                    currMonthRegionalRev: sql<number>`SUM(SUM(${sq2.trx})) OVER (PARTITION BY ${sq2.regionName})`.as('currMonthRegionalRev')
+                    branch: territoryArea4.branch,
+                    target_so: sum(feiTargetPuma.so).as('target_so')
                 })
-                .from(sq2)
-                .groupBy(sql`1,2,3,4,5`)
-                .prepare()
+                .from(feiTargetPuma)
+                .rightJoin(territoryArea4, eq(feiTargetPuma.territory, territoryArea4.kabupaten))
+                .where(eq(feiTargetPuma.periode, yyyyMM))
+                .groupBy(territoryArea4.branch)
+                .as('c')
 
-
-            // QUERY UNTUK MENDAPAT PREV MONTH REVENUE
-            const p3 = db6
+            const revenueBranch = db
                 .select({
-                    region: sql<string>`${sq3.regionName}`.as('region'),
-                    branch: sql<string>`${sq3.branchName}`.as('branch'), // Keep only one branchName
-                    subbranch: sql<string>`${sq3.subbranchName}`.as('subbranch'),
-                    cluster: sql<string>`${sq3.clusterName}`.as('cluster'),
-                    kabupaten: sql<string>`${sq3.kabupaten}`.as('kabupaten'),
-                    prevMonthKabupatenRev: sql<number>`SUM(${sq3.trx})`.as('currMonthKabupatenRev'),
-                    prevMonthClusterRev: sql<number>`SUM(SUM(${sq3.trx})) OVER (PARTITION BY ${sq3.regionName}, ${sq3.branchName}, ${sq3.subbranchName}, ${sq3.clusterName})`.as('currMonthClusterRev'),
-                    prevMonthSubbranchRev: sql<number>`SUM(SUM(${sq3.trx})) OVER (PARTITION BY ${sq3.regionName}, ${sq3.branchName}, ${sq3.subbranchName})`.as('currMonthSubbranchRev'),
-                    prevMonthBranchRev: sql<number>`SUM(SUM(${sq3.trx})) OVER (PARTITION BY ${sq3.regionName}, ${sq3.branchName})`.as('currMonthBranchRev'),
-                    prevMonthRegionalRev: sql<number>`SUM(SUM(${sq3.trx})) OVER (PARTITION BY ${sq3.regionName})`.as('currMonthRegionalRev')
+                    name: branchSubquery.branch,
+                    target_so: sql<number>`ROUND(SUM(${branchTargetRevenue.target_so}),2)`.as('target_so'),
+                    so: sql<number>`ROUND(SUM(${summaryRevBranch.trx_all_m}),2)`.as('so'),
+                    ach_target_fm_so: sql<string>`CONCAT(ROUND((SUM(${summaryRevBranch.trx_all_m})/SUM(${branchTargetRevenue.target_so}))*100,2),'%')`.as('ach_target_fm_so'),
+                    drr_so: sql<string>`CONCAT(ROUND((SUM(${summaryRevBranch.trx_all_m})/(${today}/${daysInMonth}*(SUM(${branchTargetRevenue.target_so}))))*100,2),'%')`.as('drr_so'),
+                    gap_to_target_so: sql<number>`ROUND((COALESCE(SUM(${summaryRevBranch.trx_all_m}) - SUM(${branchTargetRevenue.target_so}),0)),2)`.as('gap_to_target_so'),
+                    mom_so: sql<string>`CONCAT(${summaryRevBranch.trx_total_mom}, '%')`.as('mom_so'),
+                    so_absolut: sql<number>`ROUND(SUM(${summaryRevBranch.trx_all_m} - ${summaryRevBranch.trx_all_m1}),2)`.as('so_absolut'),
+                    yoy_so: sql<string>`CONCAT(SUM(${summaryRevBranch.trx_all_m} - ${summaryRevBranch.trx_all_m12})/${summaryRevBranch.trx_all_m12}*100, '%')`.as('yoy_so'),
+                    ytd_so: sql<string>`CONCAT(SUM(${summaryRevBranch.trx_all_ytd} - ${summaryRevBranch.trx_all_ytd1})/${summaryRevBranch.trx_all_ytd1}*100, '%')`.as('ytd_so')
                 })
-                .from(sq3)
-                .groupBy(sql`1,2,3,4,5`)
-                .prepare()
+                .from(branchSubquery)
+                .leftJoin(summaryRevBranch, eq(branchSubquery.branch, summaryRevBranch.branch))
+                .leftJoin(branchTargetRevenue, eq(branchSubquery.branch, branchTargetRevenue.branch))
+                .groupBy(branchSubquery.branch)
 
-            // QUERY UNTUK MENDAPAT PREV YEAR CURR MONTH REVENUE
-            const p4 = db6
+            const subbranchHeaderQuery = db
+                .selectDistinct({
+                    name: sql<string | null>`'SUBBRANCH'`,
+                    target_so: sql<number>`''`,
+                    so: sql<number>`''`,
+                    ach_target_fm_so: sql<string>`''`,
+                    drr_so: sql<string>`''`,
+                    gap_to_target_so: sql<number>`''`,
+                    mom_so: sql<string>`''`,
+                    so_absolut: sql<number>`''`,
+                    yoy_so: sql<string>`''`,
+                    ytd_so: sql<string>`''`,
+                })
+                .from(feiTargetPuma)
+
+            const subbranchSubquery = db
+                .select({ subbranch: territoryArea4.subbranch })
+                .from(territoryArea4)
+                .where(eq(territoryArea4.regional, 'PUMA'))
+                .groupBy(territoryArea4.subbranch)
+                .as('a')
+
+            const summaryRevSubbranch = db
                 .select({
-                    region: sql<string>`${sq4.regionName}`.as('region'),
-                    branch: sql<string>`${sq4.branchName}`.as('branch'), // Keep only one branchName
-                    subbranch: sql<string>`${sq4.subbranchName}`.as('subbranch'),
-                    cluster: sql<string>`${sq4.clusterName}`.as('cluster'),
-                    kabupaten: sql<string>`${sq4.kabupaten}`.as('kabupaten'),
-                    prevYearCurrMonthKabupatenRev: sql<number>`SUM(${sq4.trx})`.as('currMonthKabupatenRev'),
-                    prevYearCurrMonthClusterRev: sql<number>`SUM(SUM(${sq4.trx})) OVER (PARTITION BY ${sq4.regionName}, ${sq4.branchName}, ${sq4.subbranchName}, ${sq4.clusterName})`.as('currMonthClusterRev'),
-                    prevYearCurrMonthSubbranchRev: sql<number>`SUM(SUM(${sq4.trx})) OVER (PARTITION BY ${sq4.regionName}, ${sq4.branchName}, ${sq4.subbranchName})`.as('currMonthSubbranchRev'),
-                    prevYearCurrMonthBranchRev: sql<number>`SUM(SUM(${sq4.trx})) OVER (PARTITION BY ${sq4.regionName}, ${sq4.branchName})`.as('currMonthBranchRev'),
-                    prevYearCurrMonthRegionalRev: sql<number>`SUM(SUM(${sq4.trx})) OVER (PARTITION BY ${sq4.regionName})`.as('currMonthRegionalRev')
+                    subbranch: summarySoAllSubbranch.subbranch,
+                    trx_total_mom: summarySoAllSubbranch.trx_total_mom,
+                    trx_all_m: sql<number>`SUM(CASE WHEN ${summarySoAllSubbranch.tgl} = ${currDate} THEN ${summarySoAllSubbranch.trx_all_m} ELSE 0 END)`.as('trx_all_m'),
+                    trx_all_m1: sql<number>`SUM(CASE WHEN ${summarySoAllSubbranch.tgl} = ${prevDate} THEN ${summarySoAllSubbranch.trx_all_m} ELSE 0 END)`.as('trx_all_m1'),
+                    trx_all_m12: sql<number>`SUM(CASE WHEN ${summarySoAllSubbranch.tgl} = ${prevYearCurrDate} THEN ${summarySoAllSubbranch.trx_all_m} ELSE 0 END)`.as('trx_all_m12'),
+                    trx_all_ytd: sql<number>`SUM(CASE WHEN ${summarySoAllSubbranch.tgl} BETWEEN ${currJanuaryFirst} AND ${currDate} THEN ${summarySoAllSubbranch.trx_all_m} ELSE 0 END)`.as('trx_all_ytd'),
+                    trx_all_ytd1: sql<number>`SUM(CASE WHEN ${summarySoAllSubbranch.tgl} BETWEEN ${prevJanuaryFirst} AND ${prevYearCurrDate} THEN ${summarySoAllSubbranch.trx_all_m} ELSE 0 END)`.as('trx_all_ytd1'),
                 })
-                .from(sq4)
-                .groupBy(sql`1,2,3,4,5`)
-                .prepare()
+                .from(summarySoAllSubbranch, {
+                    useIndex: [
+                        index('tgl').on(summarySoAllSubbranch.tgl),
+                        index('regional').on(summarySoAllSubbranch.regional)
+                    ]
+                })
+                .where(eq(summarySoAllSubbranch.regional, 'PUMA'))
+                .groupBy(summarySoAllSubbranch.subbranch)
+                .as('b')
 
-            const queryCurrYtd = currYtdTrxSORev.map(table => `
-                    SELECT
-                        CASE WHEN region_so IN ('PUMA', 'MALUKU DAN PAPUA') THEN 'PUMA' END as region,
-                        CASE
-                            WHEN upper(kab_so) IN (
-                                'AMBON',
-                                'KOTA AMBON',
-                                'MALUKU TENGAH',
-                                'SERAM BAGIAN TIMUR',
-                                'KEPULAUAN ARU',
-                                'KOTA TUAL',
-                                'MALUKU BARAT DAYA',
-                                'MALUKU TENGGARA',
-                                'MALUKU TENGGARA BARAT',
-                                'BURU',
-                                'BURU SELATAN',
-                                'SERAM BAGIAN BARAT',
-                                'KEPULAUAN TANIMBAR'
-                            ) THEN 'AMBON'
-                            WHEN upper(kab_so) IN (
-                                'KOTA JAYAPURA',
-                                'JAYAPURA',
-                                'KEEROM',
-                                'MAMBERAMO RAYA',
-                                'SARMI',
-                                'BIAK',
-                                'BIAK NUMFOR',
-                                'KEPULAUAN YAPEN',
-                                'SUPIORI',
-                                'WAROPEN',
-                                'JAYAWIJAYA',
-                                'LANNY JAYA',
-                                'MAMBERAMO TENGAH',
-                                'NDUGA',
-                                'PEGUNUNGAN BINTANG',
-                                'TOLIKARA',
-                                'YAHUKIMO',
-                                'YALIMO'
-                            ) THEN 'JAYAPURA'
-                            WHEN upper(kab_so) IN (
-                                'MANOKWARI',
-                                'FAKFAK',
-                                'FAK FAK',
-                                'KAIMANA',
-                                'MANOKWARI SELATAN',
-                                'PEGUNUNGAN ARFAK',
-                                'TELUK BINTUNI',
-                                'TELUK WONDAMA',
-                                'KOTA SORONG',
-                                'MAYBRAT',
-                                'RAJA AMPAT',
-                                'SORONG',
-                                'SORONG SELATAN',
-                                'TAMBRAUW'
-                            ) THEN 'SORONG'
-                            WHEN upper(kab_so) IN (
-                                'ASMAT',
-                                'BOVEN DIGOEL',
-                                'MAPPI',
-                                'MERAUKE',
-                                'INTAN JAYA',
-                                'MIMIKA',
-                                'PUNCAK',
-                                'PUNCAK JAYA',
-                                'TIMIKA',
-                                'DEIYAI',
-                                'DOGIYAI',
-                                'NABIRE',
-                                'PANIAI'
-                            ) THEN 'TIMIKA'
-                            ELSE NULL
-                        END as branch,
-                        CASE
-                            WHEN upper(kab_so) IN (
-                                'AMBON',
-                                'KOTA AMBON',
-                                'MALUKU TENGAH',
-                                'SERAM BAGIAN TIMUR'
-                            ) THEN 'AMBON'
-                            WHEN upper(kab_so) IN (
-                                'KEPULAUAN ARU',
-                                'KOTA TUAL',
-                                'MALUKU BARAT DAYA',
-                                'MALUKU TENGGARA',
-                                'MALUKU TENGGARA BARAT',
-                                'KEPULAUAN TANIMBAR'
-                            ) THEN 'KEPULAUAN AMBON'
-                            WHEN upper(kab_so) IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BURU'
-                            WHEN upper(kab_so) IN ('KOTA JAYAPURA') THEN 'JAYAPURA'
-                            WHEN upper(kab_so) IN (
-                                'JAYAPURA',
-                                'KEEROM',
-                                'MAMBERAMO RAYA',
-                                'SARMI',
-                                'BIAK',
-                                'BIAK NUMFOR',
-                                'KEPULAUAN YAPEN',
-                                'SUPIORI',
-                                'WAROPEN',
-                                'JAYAWIJAYA',
-                                'LANNY JAYA',
-                                'MAMBERAMO TENGAH',
-                                'NDUGA',
-                                'PEGUNUNGAN BINTANG',
-                                'TOLIKARA',
-                                'YAHUKIMO',
-                                'YALIMO'
-                            ) THEN 'SENTANI'
-                            WHEN upper(kab_so) IN ('MANOKWARI') THEN 'MANOKWARI'
-                            WHEN upper(kab_so) IN (
-                                'FAKFAK',
-                                'FAK FAK',
-                                'KAIMANA',
-                                'MANOKWARI SELATAN',
-                                'PEGUNUNGAN ARFAK',
-                                'TELUK BINTUNI',
-                                'TELUK WONDAMA'
-                            ) THEN 'MANOKWARI OUTER'
-                            WHEN upper(kab_so) IN (
-                                'KOTA SORONG',
-                                'MAYBRAT',
-                                'RAJA AMPAT',
-                                'SORONG',
-                                'SORONG SELATAN',
-                                'TAMBRAUW'
-                            ) THEN 'SORONG RAJA AMPAT'
-                            WHEN upper(kab_so) IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'MERAUKE'
-                            WHEN upper(kab_so) IN (
-                                'INTAN JAYA',
-                                'MIMIKA',
-                                'PUNCAK',
-                                'PUNCAK JAYA',
-                                'TIMIKA'
-                            ) THEN 'MIMIKA'
-                            WHEN upper(kab_so) IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
-                            ELSE NULL
-                        END as subbranch,
-                        CASE
-                            WHEN upper(kab_so) IN (
-                                'AMBON',
-                                'KOTA AMBON',
-                                'MALUKU TENGAH',
-                                'SERAM BAGIAN TIMUR'
-                            ) THEN 'AMBON'
-                            WHEN upper(kab_so) IN (
-                                'KEPULAUAN ARU',
-                                'KOTA TUAL',
-                                'MALUKU BARAT DAYA',
-                                'MALUKU TENGGARA',
-                                'MALUKU TENGGARA BARAT',
-                                'KEPULAUAN TANIMBAR'
-                            ) THEN 'KEPULAUAN TUAL'
-                            WHEN upper(kab_so) IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BARAT BURU'
-                            WHEN upper(kab_so) IN ('KOTA JAYAPURA') THEN 'KOTA JAYAPURA'
-                            WHEN upper(kab_so) IN ('JAYAPURA', 'KEEROM', 'MAMBERAMO RAYA', 'SARMI') THEN 'JAYAPURA OUTER'
-                            WHEN upper(kab_so) IN (
-                                'BIAK',
-                                'BIAK NUMFOR',
-                                'KEPULAUAN YAPEN',
-                                'SUPIORI',
-                                'WAROPEN'
-                            ) THEN 'NEW BIAK NUMFOR'
-                            WHEN upper(kab_so) IN (
-                                'JAYAWIJAYA',
-                                'LANNY JAYA',
-                                'MAMBERAMO TENGAH',
-                                'NDUGA',
-                                'PEGUNUNGAN BINTANG',
-                                'TOLIKARA',
-                                'YAHUKIMO',
-                                'YALIMO'
-                            ) THEN 'PAPUA PEGUNUNGAN'
-                            WHEN upper(kab_so) IN ('MANOKWARI') THEN 'MANOKWARI'
-                            WHEN upper(kab_so) IN (
-                                'FAKFAK',
-                                'FAK FAK',
-                                'KAIMANA',
-                                'MANOKWARI SELATAN',
-                                'PEGUNUNGAN ARFAK',
-                                'TELUK BINTUNI',
-                                'TELUK WONDAMA'
-                            ) THEN 'MANOKWARI OUTER'
-                            WHEN upper(kab_so) IN (
-                                'KOTA SORONG',
-                                'MAYBRAT',
-                                'RAJA AMPAT',
-                                'SORONG',
-                                'SORONG SELATAN',
-                                'TAMBRAUW'
-                            ) THEN 'NEW SORONG RAJA AMPAT'
-                            WHEN upper(kab_so) IN (
-                                'INTAN JAYA',
-                                'MIMIKA',
-                                'PUNCAK',
-                                'PUNCAK JAYA',
-                                'TIMIKA'
-                            ) THEN 'MIMIKA PUNCAK'
-                            WHEN upper(kab_so) IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
-                            WHEN upper(kab_so) IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'NEW MERAUKE'
-                            ELSE NULL
-                        END as cluster,
-                        kab_so AS kabupaten,
-                        date_so,
-                        COUNT(so) as trx
-                    FROM ${table} WHERE region_so IN ('MALUKU DAN PAPUA', 'PUMA') AND kab_so <> 'TMP' GROUP BY 1,2,3,4,5`).join(' UNION ALL ')
+            const subbranchTargetRevenue = db
+                .select({
+                    subbranch: territoryArea4.subbranch,
+                    target_so: sum(feiTargetPuma.so).as('target_so')
+                })
+                .from(feiTargetPuma)
+                .rightJoin(territoryArea4, eq(feiTargetPuma.territory, territoryArea4.kabupaten))
+                .where(eq(feiTargetPuma.periode, yyyyMM))
+                .groupBy(territoryArea4.subbranch)
+                .as('c')
 
-            const queryPrevYtd = prevYtdTrxSORev.map(table => `
-                        SELECT
-                            CASE WHEN region_so IN ('PUMA', 'MALUKU DAN PAPUA') THEN 'PUMA' END as region,
-                            CASE
-                                WHEN upper(kab_so) IN (
-                                    'AMBON',
-                                    'KOTA AMBON',
-                                    'MALUKU TENGAH',
-                                    'SERAM BAGIAN TIMUR',
-                                    'KEPULAUAN ARU',
-                                    'KOTA TUAL',
-                                    'MALUKU BARAT DAYA',
-                                    'MALUKU TENGGARA',
-                                    'MALUKU TENGGARA BARAT',
-                                    'BURU',
-                                    'BURU SELATAN',
-                                    'SERAM BAGIAN BARAT',
-                                    'KEPULAUAN TANIMBAR'
-                                ) THEN 'AMBON'
-                                WHEN upper(kab_so) IN (
-                                    'KOTA JAYAPURA',
-                                    'JAYAPURA',
-                                    'KEEROM',
-                                    'MAMBERAMO RAYA',
-                                    'SARMI',
-                                    'BIAK',
-                                    'BIAK NUMFOR',
-                                    'KEPULAUAN YAPEN',
-                                    'SUPIORI',
-                                    'WAROPEN',
-                                    'JAYAWIJAYA',
-                                    'LANNY JAYA',
-                                    'MAMBERAMO TENGAH',
-                                    'NDUGA',
-                                    'PEGUNUNGAN BINTANG',
-                                    'TOLIKARA',
-                                    'YAHUKIMO',
-                                    'YALIMO'
-                                ) THEN 'JAYAPURA'
-                                WHEN upper(kab_so) IN (
-                                    'MANOKWARI',
-                                    'FAKFAK',
-                                    'FAK FAK',
-                                    'KAIMANA',
-                                    'MANOKWARI SELATAN',
-                                    'PEGUNUNGAN ARFAK',
-                                    'TELUK BINTUNI',
-                                    'TELUK WONDAMA',
-                                    'KOTA SORONG',
-                                    'MAYBRAT',
-                                    'RAJA AMPAT',
-                                    'SORONG',
-                                    'SORONG SELATAN',
-                                    'TAMBRAUW'
-                                ) THEN 'SORONG'
-                                WHEN upper(kab_so) IN (
-                                    'ASMAT',
-                                    'BOVEN DIGOEL',
-                                    'MAPPI',
-                                    'MERAUKE',
-                                    'INTAN JAYA',
-                                    'MIMIKA',
-                                    'PUNCAK',
-                                    'PUNCAK JAYA',
-                                    'TIMIKA',
-                                    'DEIYAI',
-                                    'DOGIYAI',
-                                    'NABIRE',
-                                    'PANIAI'
-                                ) THEN 'TIMIKA'
-                                ELSE NULL
-                            END as branch,
-                            CASE
-                                WHEN upper(kab_so) IN (
-                                    'AMBON',
-                                    'KOTA AMBON',
-                                    'MALUKU TENGAH',
-                                    'SERAM BAGIAN TIMUR'
-                                ) THEN 'AMBON'
-                                WHEN upper(kab_so) IN (
-                                    'KEPULAUAN ARU',
-                                    'KOTA TUAL',
-                                    'MALUKU BARAT DAYA',
-                                    'MALUKU TENGGARA',
-                                    'MALUKU TENGGARA BARAT',
-                                    'KEPULAUAN TANIMBAR'
-                                ) THEN 'KEPULAUAN AMBON'
-                                WHEN upper(kab_so) IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BURU'
-                                WHEN upper(kab_so) IN ('KOTA JAYAPURA') THEN 'JAYAPURA'
-                                WHEN upper(kab_so) IN (
-                                    'JAYAPURA',
-                                    'KEEROM',
-                                    'MAMBERAMO RAYA',
-                                    'SARMI',
-                                    'BIAK',
-                                    'BIAK NUMFOR',
-                                    'KEPULAUAN YAPEN',
-                                    'SUPIORI',
-                                    'WAROPEN',
-                                    'JAYAWIJAYA',
-                                    'LANNY JAYA',
-                                    'MAMBERAMO TENGAH',
-                                    'NDUGA',
-                                    'PEGUNUNGAN BINTANG',
-                                    'TOLIKARA',
-                                    'YAHUKIMO',
-                                    'YALIMO'
-                                ) THEN 'SENTANI'
-                                WHEN upper(kab_so) IN ('MANOKWARI') THEN 'MANOKWARI'
-                                WHEN upper(kab_so) IN (
-                                    'FAKFAK',
-                                    'FAK FAK',
-                                    'KAIMANA',
-                                    'MANOKWARI SELATAN',
-                                    'PEGUNUNGAN ARFAK',
-                                    'TELUK BINTUNI',
-                                    'TELUK WONDAMA'
-                                ) THEN 'MANOKWARI OUTER'
-                                WHEN upper(kab_so) IN (
-                                    'KOTA SORONG',
-                                    'MAYBRAT',
-                                    'RAJA AMPAT',
-                                    'SORONG',
-                                    'SORONG SELATAN',
-                                    'TAMBRAUW'
-                                ) THEN 'SORONG RAJA AMPAT'
-                                WHEN upper(kab_so) IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'MERAUKE'
-                                WHEN upper(kab_so) IN (
-                                    'INTAN JAYA',
-                                    'MIMIKA',
-                                    'PUNCAK',
-                                    'PUNCAK JAYA',
-                                    'TIMIKA'
-                                ) THEN 'MIMIKA'
-                                WHEN upper(kab_so) IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
-                                ELSE NULL
-                            END as subbranch,
-                            CASE
-                                WHEN upper(kab_so) IN (
-                                    'AMBON',
-                                    'KOTA AMBON',
-                                    'MALUKU TENGAH',
-                                    'SERAM BAGIAN TIMUR'
-                                ) THEN 'AMBON'
-                                WHEN upper(kab_so) IN (
-                                    'KEPULAUAN ARU',
-                                    'KOTA TUAL',
-                                    'MALUKU BARAT DAYA',
-                                    'MALUKU TENGGARA',
-                                    'MALUKU TENGGARA BARAT',
-                                    'KEPULAUAN TANIMBAR'
-                                ) THEN 'KEPULAUAN TUAL'
-                                WHEN upper(kab_so) IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BARAT BURU'
-                                WHEN upper(kab_so) IN ('KOTA JAYAPURA') THEN 'KOTA JAYAPURA'
-                                WHEN upper(kab_so) IN ('JAYAPURA', 'KEEROM', 'MAMBERAMO RAYA', 'SARMI') THEN 'JAYAPURA OUTER'
-                                WHEN upper(kab_so) IN (
-                                    'BIAK',
-                                    'BIAK NUMFOR',
-                                    'KEPULAUAN YAPEN',
-                                    'SUPIORI',
-                                    'WAROPEN'
-                                ) THEN 'NEW BIAK NUMFOR'
-                                WHEN upper(kab_so) IN (
-                                    'JAYAWIJAYA',
-                                    'LANNY JAYA',
-                                    'MAMBERAMO TENGAH',
-                                    'NDUGA',
-                                    'PEGUNUNGAN BINTANG',
-                                    'TOLIKARA',
-                                    'YAHUKIMO',
-                                    'YALIMO'
-                                ) THEN 'PAPUA PEGUNUNGAN'
-                                WHEN upper(kab_so) IN ('MANOKWARI') THEN 'MANOKWARI'
-                                WHEN upper(kab_so) IN (
-                                    'FAKFAK',
-                                    'FAK FAK',
-                                    'KAIMANA',
-                                    'MANOKWARI SELATAN',
-                                    'PEGUNUNGAN ARFAK',
-                                    'TELUK BINTUNI',
-                                    'TELUK WONDAMA'
-                                ) THEN 'MANOKWARI OUTER'
-                                WHEN upper(kab_so) IN (
-                                    'KOTA SORONG',
-                                    'MAYBRAT',
-                                    'RAJA AMPAT',
-                                    'SORONG',
-                                    'SORONG SELATAN',
-                                    'TAMBRAUW'
-                                ) THEN 'NEW SORONG RAJA AMPAT'
-                                WHEN upper(kab_so) IN (
-                                    'INTAN JAYA',
-                                    'MIMIKA',
-                                    'PUNCAK',
-                                    'PUNCAK JAYA',
-                                    'TIMIKA'
-                                ) THEN 'MIMIKA PUNCAK'
-                                WHEN upper(kab_so) IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
-                                WHEN upper(kab_so) IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'NEW MERAUKE'
-                                ELSE NULL
-                            END as cluster,
-                            kab_so as kabupaten,
-                            date_so,
-                            COUNT(so) as trx
-                        FROM ${table} WHERE region_so IN ('PUMA', 'MALUKU DAN PAPUA') AND kab_so <> 'TMP' GROUP BY 1,2,3,4,5`).join(' UNION ALL ')
+            const revenueSubbranch = db
+                .select({
+                    name: subbranchSubquery.subbranch,
+                    target_so: sql<number>`ROUND(SUM(${subbranchTargetRevenue.target_so}),2)`.as('target_so'),
+                    so: sql<number>`ROUND(SUM(${summaryRevSubbranch.trx_all_m}),2)`.as('so'),
+                    ach_target_fm_so: sql<string>`CONCAT(ROUND((SUM(${summaryRevSubbranch.trx_all_m})/SUM(${subbranchTargetRevenue.target_so}))*100,2),'%')`.as('ach_target_fm_so'),
+                    drr_so: sql<string>`CONCAT(ROUND((SUM(${summaryRevSubbranch.trx_all_m})/(${today}/${daysInMonth}*(SUM(${subbranchTargetRevenue.target_so}))))*100,2),'%')`.as('drr_so'),
+                    gap_to_target_so: sql<number>`ROUND((COALESCE(SUM(${summaryRevSubbranch.trx_all_m}) - SUM(${subbranchTargetRevenue.target_so}),0)),2)`.as('gap_to_target_so'),
+                    mom_so: sql<string>`CONCAT(${summaryRevSubbranch.trx_total_mom}, '%')`.as('mom_so'),
+                    so_absolut: sql<number>`ROUND(SUM(${summaryRevSubbranch.trx_all_m} - ${summaryRevSubbranch.trx_all_m1}),2)`.as('so_absolut'),
+                    yoy_so: sql<string>`CONCAT(SUM(${summaryRevSubbranch.trx_all_m} - ${summaryRevSubbranch.trx_all_m12})/${summaryRevSubbranch.trx_all_m12}*100, '%')`.as('yoy_so'),
+                    ytd_so: sql<string>`CONCAT(SUM(${summaryRevSubbranch.trx_all_ytd} - ${summaryRevSubbranch.trx_all_ytd1})/${summaryRevSubbranch.trx_all_ytd1}*100, '%')`.as('ytd_so')
+                })
+                .from(subbranchSubquery)
+                .leftJoin(summaryRevSubbranch, eq(subbranchSubquery.subbranch, summaryRevSubbranch.subbranch))
+                .leftJoin(subbranchTargetRevenue, eq(subbranchSubquery.subbranch, subbranchTargetRevenue.subbranch))
+                .groupBy(subbranchSubquery.subbranch)
 
-            const sq = `
-                        WITH sq AS (
-                            ${queryCurrYtd}
-                        )
-                        SELECT
-                            region,
-                            branch,
-                            subbranch,
-                            cluster,
-                            kabupaten,
-                            SUM(trx) AS currYtdKabupatenRev,
-                            SUM(SUM(trx)) OVER (PARTITION BY region, branch, subbranch, cluster) AS currYtdClusterRev,
-                            SUM(SUM(trx)) OVER (PARTITION BY region, branch, subbranch) AS currYtdSubbranchRev,
-                            SUM(SUM(trx)) OVER (PARTITION BY region, branch) AS currYtdBranchRev,
-                            SUM(SUM(trx)) OVER (PARTITION BY region) AS currYtdRegionalRev
-                        FROM sq
-                        WHERE date_so BETWEEN '${currJanuaryFirst}' AND '${currDate}'
-                        GROUP BY 1, 2, 3, 4, 5
-                            `
+            const clusterHeaderQuery = db
+                .selectDistinct({
+                    name: sql<string | null>`'CLUSTER'`,
+                    target_so: sql<number>`''`,
+                    so: sql<number>`''`,
+                    ach_target_fm_so: sql<string>`''`,
+                    drr_so: sql<string>`''`,
+                    gap_to_target_so: sql<number>`''`,
+                    mom_so: sql<string>`''`,
+                    so_absolut: sql<number>`''`,
+                    yoy_so: sql<string>`''`,
+                    ytd_so: sql<string>`''`,
+                })
+                .from(feiTargetPuma)
 
-            const sq5 = `
-                        WITH sq5 AS (
-                            ${queryPrevYtd}
-                        )
-                        SELECT
-                            region,
-                            branch,
-                            subbranch,
-                            cluster,
-                            kabupaten,
-                            SUM(trx) AS prevYtdKabupatenRev,
-                            SUM(SUM(trx)) OVER (PARTITION BY region, branch, subbranch, cluster) AS prevYtdClusterRev,
-                            SUM(SUM(trx)) OVER (PARTITION BY region, branch, subbranch) AS prevYtdSubbranchRev,
-                            SUM(SUM(trx)) OVER (PARTITION BY region, branch) AS prevYtdBranchRev,
-                            SUM(SUM(trx)) OVER (PARTITION BY region) AS prevYtdRegionalRev
-                        FROM sq5
-                        WHERE date_so BETWEEN '${prevJanuaryFirst}' AND '${prevYearCurrDate}'
-                        GROUP BY 1, 2, 3, 4, 5
-                            `
+            const clusterSubquery = db
+                .select({ cluster: territoryArea4.cluster })
+                .from(territoryArea4)
+                .where(eq(territoryArea4.regional, 'PUMA'))
+                .groupBy(territoryArea4.cluster)
+                .as('a')
 
-            const [targetRevenue, currMonthRevenue, prevMonthRevenue, prevYearCurrMonthRevenue, currYtdRev, prevYtdRev] = await Promise.all([
-                p1.execute(),
-                p2.execute(),
-                p3.execute(),
-                p4.execute(),
-                db6.execute(sql.raw(sq)),
-                db6.execute(sql.raw(sq5))
+            const summaryRevCluster = db
+                .select({
+                    cluster: summarySoAllCluster.cluster,
+                    trx_total_mom: summarySoAllCluster.trx_total_mom,
+                    trx_all_m: sql<number>`SUM(CASE WHEN ${summarySoAllCluster.tgl} = ${currDate} THEN ${summarySoAllCluster.trx_all_m} ELSE 0 END)`.as('trx_all_m'),
+                    trx_all_m1: sql<number>`SUM(CASE WHEN ${summarySoAllCluster.tgl} = ${prevDate} THEN ${summarySoAllCluster.trx_all_m} ELSE 0 END)`.as('trx_all_m1'),
+                    trx_all_m12: sql<number>`SUM(CASE WHEN ${summarySoAllCluster.tgl} = ${prevYearCurrDate} THEN ${summarySoAllCluster.trx_all_m} ELSE 0 END)`.as('trx_all_m12'),
+                    trx_all_ytd: sql<number>`SUM(CASE WHEN ${summarySoAllCluster.tgl} BETWEEN ${currJanuaryFirst} AND ${currDate} THEN ${summarySoAllCluster.trx_all_m} ELSE 0 END)`.as('trx_all_ytd'),
+                    trx_all_ytd1: sql<number>`SUM(CASE WHEN ${summarySoAllCluster.tgl} BETWEEN ${prevJanuaryFirst} AND ${prevYearCurrDate} THEN ${summarySoAllCluster.trx_all_m} ELSE 0 END)`.as('trx_all_ytd1'),
+                })
+                .from(summarySoAllCluster, {
+                    useIndex: [
+                        index('tgl').on(summarySoAllCluster.tgl),
+                        index('regional').on(summarySoAllCluster.regional)
+                    ]
+                })
+                .where(eq(summarySoAllCluster.regional, 'PUMA'))
+                .groupBy(summarySoAllCluster.cluster)
+                .as('b')
+
+            const clusterTargetRevenue = db
+                .select({
+                    cluster: territoryArea4.cluster,
+                    target_so: sum(feiTargetPuma.so).as('target_so')
+                })
+                .from(feiTargetPuma)
+                .rightJoin(territoryArea4, eq(feiTargetPuma.territory, territoryArea4.kabupaten))
+                .where(eq(feiTargetPuma.periode, yyyyMM))
+                .groupBy(territoryArea4.cluster)
+                .as('c')
+
+            const revenueCluster = db
+                .select({
+                    name: clusterSubquery.cluster,
+                    target_so: sql<number>`ROUND(SUM(${clusterTargetRevenue.target_so}),2)`.as('target_so'),
+                    so: sql<number>`ROUND(SUM(${summaryRevCluster.trx_all_m}),2)`.as('so'),
+                    ach_target_fm_so: sql<string>`CONCAT(ROUND((SUM(${summaryRevCluster.trx_all_m})/SUM(${clusterTargetRevenue.target_so}))*100,2),'%')`.as('ach_target_fm_so'),
+                    drr_so: sql<string>`CONCAT(ROUND((SUM(${summaryRevCluster.trx_all_m})/(${today}/${daysInMonth}*(SUM(${clusterTargetRevenue.target_so}))))*100,2),'%')`.as('drr_so'),
+                    gap_to_target_so: sql<number>`ROUND((COALESCE(SUM(${summaryRevCluster.trx_all_m}) - SUM(${clusterTargetRevenue.target_so}),0)),2)`.as('gap_to_target_so'),
+                    mom_so: sql<string>`CONCAT(${summaryRevCluster.trx_total_mom}, '%')`.as('mom_so'),
+                    so_absolut: sql<number>`ROUND(SUM(${summaryRevCluster.trx_all_m} - ${summaryRevCluster.trx_all_m1}),2)`.as('so_absolut'),
+                    yoy_so: sql<string>`CONCAT(SUM(${summaryRevCluster.trx_all_m} - ${summaryRevCluster.trx_all_m12})/${summaryRevCluster.trx_all_m12}*100, '%')`.as('yoy_so'),
+                    ytd_so: sql<string>`CONCAT(SUM(${summaryRevCluster.trx_all_ytd} - ${summaryRevCluster.trx_all_ytd1})/${summaryRevCluster.trx_all_ytd1}*100, '%')`.as('ytd_so')
+                })
+                .from(clusterSubquery)
+                .leftJoin(summaryRevCluster, eq(clusterSubquery.cluster, summaryRevCluster.cluster))
+                .leftJoin(clusterTargetRevenue, eq(clusterSubquery.cluster, clusterTargetRevenue.cluster))
+                .groupBy(clusterSubquery.cluster)
+
+            const kabupatenHeaderQuery = db
+                .selectDistinct({
+                    name: sql<string | null>`'KABUPATEN'`,
+                    target_so: sql<number>`''`,
+                    so: sql<number>`''`,
+                    ach_target_fm_so: sql<string>`''`,
+                    drr_so: sql<string>`''`,
+                    gap_to_target_so: sql<number>`''`,
+                    mom_so: sql<string>`''`,
+                    so_absolut: sql<number>`''`,
+                    yoy_so: sql<string>`''`,
+                    ytd_so: sql<string>`''`,
+                })
+                .from(feiTargetPuma)
+
+            const kabupatenSubquery = db
+                .select({ kabupaten: territoryArea4.kabupaten })
+                .from(territoryArea4)
+                .where(eq(territoryArea4.regional, 'PUMA'))
+                .groupBy(territoryArea4.kabupaten)
+                .as('a')
+
+            const summaryRevKabupaten = db
+                .select({
+                    kabupaten: summarySoAllKabupaten.kabupaten,
+                    trx_total_mom: summarySoAllKabupaten.trx_total_mom,
+                    trx_all_m: sql<number>`SUM(CASE WHEN ${summarySoAllKabupaten.tgl} = ${currDate} THEN ${summarySoAllKabupaten.trx_all_m} ELSE 0 END)`.as('trx_all_m'),
+                    trx_all_m1: sql<number>`SUM(CASE WHEN ${summarySoAllKabupaten.tgl} = ${prevDate} THEN ${summarySoAllKabupaten.trx_all_m} ELSE 0 END)`.as('trx_all_m1'),
+                    trx_all_m12: sql<number>`SUM(CASE WHEN ${summarySoAllKabupaten.tgl} = ${prevYearCurrDate} THEN ${summarySoAllKabupaten.trx_all_m} ELSE 0 END)`.as('trx_all_m12'),
+                    trx_all_ytd: sql<number>`SUM(CASE WHEN ${summarySoAllKabupaten.tgl} BETWEEN ${currJanuaryFirst} AND ${currDate} THEN ${summarySoAllKabupaten.trx_all_m} ELSE 0 END)`.as('trx_all_ytd'),
+                    trx_all_ytd1: sql<number>`SUM(CASE WHEN ${summarySoAllKabupaten.tgl} BETWEEN ${prevJanuaryFirst} AND ${prevYearCurrDate} THEN ${summarySoAllKabupaten.trx_all_m} ELSE 0 END)`.as('trx_all_ytd1'),
+                })
+                .from(summarySoAllKabupaten, {
+                    useIndex: [
+                        index('tgl').on(summarySoAllKabupaten.tgl),
+                        index('regional').on(summarySoAllKabupaten.regional)
+                    ]
+                })
+                .where(eq(summarySoAllKabupaten.regional, 'PUMA'))
+                .groupBy(summarySoAllKabupaten.kabupaten)
+                .as('b')
+
+            const kabupatenTargetRevenue = db
+                .select({
+                    kabupaten: territoryArea4.kabupaten,
+                    target_so: sum(feiTargetPuma.so).as('target_so')
+                })
+                .from(feiTargetPuma)
+                .rightJoin(territoryArea4, eq(feiTargetPuma.territory, territoryArea4.kabupaten))
+                .where(eq(feiTargetPuma.periode, yyyyMM))
+                .groupBy(territoryArea4.kabupaten)
+                .as('c')
+
+            const revenueKabupaten = db
+                .select({
+                    name: kabupatenSubquery.kabupaten,
+                    target_so: sql<number>`ROUND(SUM(${kabupatenTargetRevenue.target_so}),2)`.as('target_so'),
+                    so: sql<number>`ROUND(SUM(${summaryRevKabupaten.trx_all_m}),2)`.as('so'),
+                    ach_target_fm_so: sql<string>`CONCAT(ROUND((SUM(${summaryRevKabupaten.trx_all_m})/SUM(${kabupatenTargetRevenue.target_so}))*100,2),'%')`.as('ach_target_fm_so'),
+                    drr_so: sql<string>`CONCAT(ROUND((SUM(${summaryRevKabupaten.trx_all_m})/(${today}/${daysInMonth}*(SUM(${kabupatenTargetRevenue.target_so}))))*100,2),'%')`.as('drr_so'),
+                    gap_to_target_so: sql<number>`ROUND((COALESCE(SUM(${summaryRevKabupaten.trx_all_m}) - SUM(${kabupatenTargetRevenue.target_so}),0)),2)`.as('gap_to_target_so'),
+                    mom_so: sql<string>`CONCAT(${summaryRevKabupaten.trx_total_mom}, '%')`.as('mom_so'),
+                    so_absolut: sql<number>`ROUND(SUM(${summaryRevKabupaten.trx_all_m} - ${summaryRevKabupaten.trx_all_m1}),2)`.as('so_absolut'),
+                    yoy_so: sql<string>`CONCAT(SUM(${summaryRevKabupaten.trx_all_m} - ${summaryRevKabupaten.trx_all_m12})/${summaryRevKabupaten.trx_all_m12}*100, '%')`.as('yoy_so'),
+                    ytd_so: sql<string>`CONCAT(SUM(${summaryRevKabupaten.trx_all_ytd} - ${summaryRevKabupaten.trx_all_ytd1})/${summaryRevKabupaten.trx_all_ytd1}*100, '%')`.as('ytd_so')
+                })
+                .from(kabupatenSubquery)
+                .leftJoin(summaryRevKabupaten, eq(kabupatenSubquery.kabupaten, summaryRevKabupaten.kabupaten))
+                .leftJoin(kabupatenTargetRevenue, eq(kabupatenSubquery.kabupaten, kabupatenTargetRevenue.kabupaten))
+                .groupBy(kabupatenSubquery.kabupaten)
+
+            const [finalDataRevenue] = await Promise.all([
+                unionAll(revenueRegional, branchHeaderQuery, revenueBranch, subbranchHeaderQuery, revenueSubbranch, clusterHeaderQuery, revenueCluster, kabupatenHeaderQuery, revenueKabupaten)
             ])
-
-            const regionalsMap = new Map();
-            const [currYtdRevenue] = currYtdRev as MySqlRawQueryResult as unknown as [CurrYtDRevenue[], any]
-            const [prevYtdRevenue] = prevYtdRev as MySqlRawQueryResult as unknown as [PrevYtDRevenue[], any]
-
-            targetRevenue.forEach((row) => {
-                const regionalName = row.region;
-                const branchName = row.branch;
-                const subbranchName = row.subbranch;
-                const clusterName = row.cluster;
-                const kabupatenName = row.kabupaten;
-
-                const regional = regionalsMap.get(regionalName) || regionalsMap.set(regionalName, {
-                    name: regionalName,
-                    currMonthRevenue: 0,
-                    currMonthTarget: 0,
-                    currYtdRevenue: 0,
-                    prevYtdRevenue: 0,
-                    prevMonthRevenue: 0,
-                    prevYearCurrMonthRevenue: 0,
-                    branches: new Map()
-                }).get(regionalName);
-                regional.currMonthTarget += Number(row.currMonthTargetRev)
-
-                const branch = regional.branches.get(branchName) ||
-                    (regional.branches.set(branchName, {
-                        name: branchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        subbranches: new Map()
-                    }), regional.branches.get(branchName));  // Get the newly set value
-                branch.currMonthTarget += Number(row.currMonthTargetRev)
-
-                // Initialize subbranch if it doesn't exist
-                const subbranch = branch.subbranches.get(subbranchName) ||
-                    (branch.subbranches.set(subbranchName, {
-                        name: subbranchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        clusters: new Map()
-                    }), branch.subbranches.get(subbranchName));
-                subbranch.currMonthTarget += Number(row.currMonthTargetRev)
-
-                // Initialize cluster if it doesn't exist
-                const cluster = subbranch.clusters.get(clusterName) ||
-                    (subbranch.clusters.set(clusterName, {
-                        name: clusterName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        kabupatens: new Map()
-                    }), subbranch.clusters.get(clusterName));
-                cluster.currMonthTarget += Number(row.currMonthTargetRev)
-
-                // Initialize kabupaten if it doesn't exist
-                cluster.kabupatens.get(kabupatenName) ||
-                    (cluster.kabupatens.set(kabupatenName, {
-                        name: kabupatenName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: Number(row.currMonthTargetRev),
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0
-                    }), cluster.kabupatens.get(kabupatenName));
-            })
-
-            currMonthRevenue.forEach((row) => {
-                const regionalName = row.region;
-                const branchName = row.branch;
-                const subbranchName = row.subbranch;
-                const clusterName = row.cluster;
-                const kabupatenName = row.kabupaten;
-
-                const regional = regionalsMap.get(regionalName) || regionalsMap.set(regionalName, {
-                    name: regionalName,
-                    currMonthRevenue: 0,
-                    currMonthTarget: 0,
-                    currYtdRevenue: 0,
-                    prevYtdRevenue: 0,
-                    prevMonthRevenue: 0,
-                    prevYearCurrMonthRevenue: 0,
-                    branches: new Map()
-                }).get(regionalName);
-                regional.currMonthRevenue = Number(row.currMonthRegionalRev)
-
-                const branch = regional.branches.get(branchName) ||
-                    (regional.branches.set(branchName, {
-                        name: branchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        subbranches: new Map()
-                    }), regional.branches.get(branchName));  // Get the newly set value
-                branch.currMonthRevenue = Number(row.currMonthBranchRev)
-
-                // Initialize subbranch if it doesn't exist
-                const subbranch = branch.subbranches.get(subbranchName) ||
-                    (branch.subbranches.set(subbranchName, {
-                        name: subbranchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        clusters: new Map()
-                    }), branch.subbranches.get(subbranchName));
-                subbranch.currMonthRevenue = Number(row.currMonthSubbranchRev)
-
-                // Initialize cluster if it doesn't exist
-                const cluster = subbranch.clusters.get(clusterName) ||
-                    (subbranch.clusters.set(clusterName, {
-                        name: clusterName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        kabupatens: new Map()
-                    }), subbranch.clusters.get(clusterName));
-                cluster.currMonthRevenue = Number(row.currMonthClusterRev)
-
-                // Initialize kabupaten if it doesn't exist
-                const kabupaten = cluster.kabupatens.get(kabupatenName) ||
-                    (cluster.kabupatens.set(kabupatenName, {
-                        name: kabupatenName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0
-                    }), cluster.kabupatens.get(kabupatenName));
-
-                kabupaten.currMonthRevenue = Number(row.currMonthKabupatenRev)
-            })
-
-            prevMonthRevenue.forEach((row) => {
-                const regionalName = row.region;
-                const branchName = row.branch;
-                const subbranchName = row.subbranch;
-                const clusterName = row.cluster;
-                const kabupatenName = row.kabupaten;
-
-                const regional = regionalsMap.get(regionalName) || regionalsMap.set(regionalName, {
-                    name: regionalName,
-                    currMonthRevenue: 0,
-                    currMonthTarget: 0,
-                    currYtdRevenue: 0,
-                    prevYtdRevenue: 0,
-                    prevMonthRevenue: 0,
-                    prevYearCurrMonthRevenue: 0,
-                    branches: new Map()
-                }).get(regionalName);
-                regional.prevMonthRevenue = Number(row.prevMonthRegionalRev)
-
-                const branch = regional.branches.get(branchName) ||
-                    (regional.branches.set(branchName, {
-                        name: branchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        subbranches: new Map()
-                    }), regional.branches.get(branchName));  // Get the newly set value
-                branch.prevMonthRevenue = Number(row.prevMonthBranchRev)
-
-                // Initialize subbranch if it doesn't exist
-                const subbranch = branch.subbranches.get(subbranchName) ||
-                    (branch.subbranches.set(subbranchName, {
-                        name: subbranchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        clusters: new Map()
-                    }), branch.subbranches.get(subbranchName));
-                subbranch.prevMonthRevenue = Number(row.prevMonthSubbranchRev)
-
-                // Initialize cluster if it doesn't exist
-                const cluster = subbranch.clusters.get(clusterName) ||
-                    (subbranch.clusters.set(clusterName, {
-                        name: clusterName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        kabupatens: new Map()
-                    }), subbranch.clusters.get(clusterName));
-                cluster.prevMonthRevenue = Number(row.prevMonthClusterRev)
-
-                // Initialize kabupaten if it doesn't exist
-                const kabupaten = cluster.kabupatens.get(kabupatenName) ||
-                    (cluster.kabupatens.set(kabupatenName, {
-                        name: kabupatenName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0
-                    }), cluster.kabupatens.get(kabupatenName));
-                kabupaten.prevMonthRevenue = Number(row.prevMonthKabupatenRev)
-            })
-
-            prevYearCurrMonthRevenue.forEach((row) => {
-                const regionalName = row.region;
-                const branchName = row.branch;
-                const subbranchName = row.subbranch;
-                const clusterName = row.cluster;
-                const kabupatenName = row.kabupaten;
-
-                const regional = regionalsMap.get(regionalName) || regionalsMap.set(regionalName, {
-                    name: regionalName,
-                    currMonthRevenue: 0,
-                    currMonthTarget: 0,
-                    currYtdRevenue: 0,
-                    prevYtdRevenue: 0,
-                    prevMonthRevenue: 0,
-                    prevYearCurrMonthRevenue: 0,
-                    branches: new Map()
-                }).get(regionalName);
-                regional.prevYearCurrMonthRevenue = Number(row.prevYearCurrMonthRegionalRev)
-
-                const branch = regional.branches.get(branchName) ||
-                    (regional.branches.set(branchName, {
-                        name: branchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        subbranches: new Map()
-                    }), regional.branches.get(branchName));  // Get the newly set value
-                branch.prevYearCurrMonthRevenue = Number(row.prevYearCurrMonthBranchRev)
-
-                // Initialize subbranch if it doesn't exist
-                const subbranch = branch.subbranches.get(subbranchName) ||
-                    (branch.subbranches.set(subbranchName, {
-                        name: subbranchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        clusters: new Map()
-                    }), branch.subbranches.get(subbranchName));
-                subbranch.prevYearCurrMonthRevenue = Number(row.prevYearCurrMonthSubbranchRev)
-
-                // Initialize cluster if it doesn't exist
-                const cluster = subbranch.clusters.get(clusterName) ||
-                    (subbranch.clusters.set(clusterName, {
-                        name: clusterName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        kabupatens: new Map()
-                    }), subbranch.clusters.get(clusterName));
-                cluster.prevYearCurrMonthRevenue = Number(row.prevYearCurrMonthClusterRev)
-
-                // Initialize kabupaten if it doesn't exist
-                const kabupaten = cluster.kabupatens.get(kabupatenName) ||
-                    (cluster.kabupatens.set(kabupatenName, {
-                        name: kabupatenName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0
-                    }), cluster.kabupatens.get(kabupatenName));
-                kabupaten.prevYearCurrMonthRevenue = Number(row.prevYearCurrMonthKabupatenRev)
-            })
-
-            currYtdRevenue.forEach((row: any) => {
-                const regionalName = row.region;
-                const branchName = row.branch;
-                const subbranchName = row.subbranch;
-                const clusterName = row.cluster;
-                const kabupatenName = row.kabupaten;
-
-                const regional = regionalsMap.get(regionalName) || regionalsMap.set(regionalName, {
-                    name: regionalName,
-                    currMonthRevenue: 0,
-                    currMonthTarget: 0,
-                    currYtdRevenue: 0,
-                    prevYtdRevenue: 0,
-                    prevMonthRevenue: 0,
-                    prevYearCurrMonthRevenue: 0,
-                    branches: new Map()
-                }).get(regionalName);
-                regional.currYtdRevenue = Number(row.currYtdRegionalRev)
-
-                const branch = regional.branches.get(branchName) ||
-                    (regional.branches.set(branchName, {
-                        name: branchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        subbranches: new Map()
-                    }), regional.branches.get(branchName));  // Get the newly set value
-                branch.currYtdRevenue = Number(row.currYtdBranchRev)
-
-                // Initialize subbranch if it doesn't exist
-                const subbranch = branch.subbranches.get(subbranchName) ||
-                    (branch.subbranches.set(subbranchName, {
-                        name: subbranchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        clusters: new Map()
-                    }), branch.subbranches.get(subbranchName));
-                subbranch.currYtdRevenue = Number(row.currYtdSubbranchRev)
-
-                // Initialize cluster if it doesn't exist
-                const cluster = subbranch.clusters.get(clusterName) ||
-                    (subbranch.clusters.set(clusterName, {
-                        name: clusterName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        kabupatens: new Map()
-                    }), subbranch.clusters.get(clusterName));
-                cluster.currYtdRevenue = Number(row.currYtdClusterRev)
-
-                // Initialize kabupaten if it doesn't exist
-                const kabupaten = cluster.kabupatens.get(kabupatenName) ||
-                    (cluster.kabupatens.set(kabupatenName, {
-                        name: kabupatenName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0
-                    }), cluster.kabupatens.get(kabupatenName));
-                kabupaten.currYtdRevenue = Number(row.currYtdKabupatenRev)
-            })
-
-            prevYtdRevenue.forEach((row: any) => {
-                const regionalName = row.region;
-                const branchName = row.branch;
-                const subbranchName = row.subbranch;
-                const clusterName = row.cluster;
-                const kabupatenName = row.kabupaten;
-
-                const regional = regionalsMap.get(regionalName) || regionalsMap.set(regionalName, {
-                    name: regionalName,
-                    currMonthRevenue: 0,
-                    currMonthTarget: 0,
-                    currYtdRevenue: 0,
-                    prevYtdRevenue: 0,
-                    prevMonthRevenue: 0,
-                    prevYearCurrMonthRevenue: 0,
-                    branches: new Map()
-                }).get(regionalName);
-                regional.prevYtdRevenue = Number(row.prevYtdRegionalRev)
-
-                const branch = regional.branches.get(branchName) ||
-                    (regional.branches.set(branchName, {
-                        name: branchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        subbranches: new Map()
-                    }), regional.branches.get(branchName));  // Get the newly set value
-                branch.prevYtdRevenue = Number(row.prevYtdBranchRev)
-
-                // Initialize subbranch if it doesn't exist
-                const subbranch = branch.subbranches.get(subbranchName) ||
-                    (branch.subbranches.set(subbranchName, {
-                        name: subbranchName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        clusters: new Map()
-                    }), branch.subbranches.get(subbranchName));
-                subbranch.prevYtdRevenue = Number(row.prevYtdSubbranchRev)
-
-                // Initialize cluster if it doesn't exist
-                const cluster = subbranch.clusters.get(clusterName) ||
-                    (subbranch.clusters.set(clusterName, {
-                        name: clusterName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0,
-                        kabupatens: new Map()
-                    }), subbranch.clusters.get(clusterName));
-                cluster.prevYtdRevenue = Number(row.prevYtdClusterRev)
-
-                // Initialize kabupaten if it doesn't exist
-                const kabupaten = cluster.kabupatens.get(kabupatenName) ||
-                    (cluster.kabupatens.set(kabupatenName, {
-                        name: kabupatenName,
-                        currMonthRevenue: 0,
-                        currMonthTarget: 0,
-                        currYtdRevenue: 0,
-                        prevYtdRevenue: 0,
-                        prevMonthRevenue: 0,
-                        prevYearCurrMonthRevenue: 0
-                    }), cluster.kabupatens.get(kabupatenName));
-                kabupaten.prevYtdRevenue = Number(row.prevYtdKabupatenRev)
-            })
-
-            const finalDataRevenue: Regional[] = Array.from(regionalsMap.values()).map((regional: Regional) => ({
-                ...regional,
-                branches: Array.from(regional.branches.values()).map((branch) => ({
-                    ...branch,
-                    subbranches: Array.from(branch.subbranches.values()).map((subbranch) => ({
-                        ...subbranch,
-                        clusters: Array.from(subbranch.clusters.values()).map((cluster) => ({
-                            ...cluster,
-                            kabupatens: Array.from(cluster.kabupatens.values())
-                        })),
-                    })),
-                })),
-            }));
 
             return c.json({ data: finalDataRevenue }, 200)
         })

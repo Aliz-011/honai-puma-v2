@@ -83,6 +83,38 @@ export const kabupatenRelations = relations(kabupatens, ({ one, many }) => ({
     payingLOS_01: many(payingLOS_01),
 }));
 
+export const territoryArea4 = pumaSchema.table('teritory_area4_2023', {
+    regional: varchar('regional', { length: 100 }),
+    branch: varchar('branch', { length: 100 }),
+    subbranch: varchar('subbranch', { length: 100 }),
+    cluster: varchar('cluster', { length: 100 }),
+    kabupaten: varchar('kabupaten', { length: 100 }),
+}, t => [
+    index('teritory_area4_2023_regional_IDX').on(t.regional, t.branch, t.subbranch, t.cluster, t.kabupaten).using('btree')
+])
+
+export const territoryHousehold = pumaSchema.table('ref_teritory_household', {
+    area: varchar('area', { length: 20 }),
+    regional: varchar('regional', { length: 100 }),
+    branch: varchar('branch', { length: 100 }),
+    cluster: varchar('cluster', { length: 100 }),
+    kabupaten: varchar('kabupaten', { length: 200 }),
+    wok: varchar('wok', { length: 100 }),
+    sto: varchar('sto', { length: 100 }),
+    nama_sto: varchar('nama_sto', { length: 100 }),
+    code_nama_sto: varchar('code_nama_sto', { length: 100 }),
+})
+
+export const territoryArea4RgbHq = pumaSchema.table('teritory_area4_2023_rgb_hq', {
+    regional: varchar('regional', { length: 50 }),
+    branch: varchar('branch', { length: 50 }),
+    subbranch: varchar('subbranch', { length: 50 }),
+    cluster: varchar('cluster', { length: 50 }),
+    kabupaten: varchar('kabupaten', { length: 50 }),
+}, t => ({
+    teritory_area4_2023_kabupaten_IDX: index('teritory_area4_2023_kabupaten_IDX').on(t.kabupaten).using('btree')
+}))
+
 export const revenueGrosses = pumaSchema.table("Target_revenue_gross_2025", {
     id: varchar("id", { length: 100 }).primaryKey(),
     kabupatenId: varchar("id_kabupaten", { length: 100 }).notNull(),

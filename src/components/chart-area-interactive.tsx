@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from "react"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import { CartesianGrid, XAxis, Bar, BarChart } from "recharts"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
@@ -15,7 +15,7 @@ import {
     type ChartConfig,
     ChartContainer,
     ChartTooltip,
-    ChartTooltipContent,
+    ChartTooltipContent
 } from "@/components/ui/chart"
 import {
     Select,
@@ -163,7 +163,7 @@ export function ChartAreaInteractive() {
     return (
         <Card className="@container/card">
             <CardHeader className="relative">
-                <CardTitle>Total Visitors</CardTitle>
+                <CardTitle>IO RE PS</CardTitle>
                 <CardDescription>
                     <span className="@[540px]/card:block hidden">
                         Total for the last 3 months
@@ -214,7 +214,7 @@ export function ChartAreaInteractive() {
                     config={chartConfig}
                     className="aspect-auto h-[250px] w-full"
                 >
-                    <AreaChart data={filteredData}>
+                    <BarChart data={filteredData}>
                         <defs>
                             <linearGradient id="fillDesktop" x1="0" y1="0" x2="0" y2="1">
                                 <stop
@@ -266,25 +266,23 @@ export function ChartAreaInteractive() {
                                             day: "numeric",
                                         })
                                     }}
-                                    indicator="dot"
+                                    indicator="dashed"
                                 />
                             }
                         />
-                        <Area
+                        <Bar
                             dataKey="mobile"
-                            type="natural"
+                            radius={4}
                             fill="url(#fillMobile)"
                             stroke="var(--color-mobile)"
-                            stackId="a"
                         />
-                        <Area
+                        <Bar
                             dataKey="desktop"
-                            type="natural"
+                            radius={4}
                             fill="url(#fillDesktop)"
                             stroke="var(--color-desktop)"
-                            stackId="a"
                         />
-                    </AreaChart>
+                    </BarChart>
                 </ChartContainer>
             </CardContent>
         </Card>
