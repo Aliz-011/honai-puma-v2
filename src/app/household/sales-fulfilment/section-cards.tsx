@@ -7,9 +7,9 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card"
-import { type ResponseData } from "./page"
+import { type SalesFulfilmentResponseData } from "@/types"
 
-export const SectionCards = ({ data }: { data: ResponseData[] }) => {
+export const SectionCards = ({ data }: { data: SalesFulfilmentResponseData[] }) => {
     return (
         <div className="*:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4 grid grid-cols-1 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card">
             {data.map((item, index) => (

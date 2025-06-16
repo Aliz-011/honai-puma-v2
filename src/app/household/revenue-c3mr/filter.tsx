@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import DatePicker from 'react-datepicker'
-import { getDaysInMonth, getMonth, getYear, subDays } from 'date-fns'
+import { getDaysInMonth, getMonth, getYear, subDays, setDate } from 'date-fns'
 
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -23,10 +23,11 @@ import { useSelectSto } from '@/hooks/use-select-sto';
 import { useSelectDate } from '@/hooks/use-select-date';
 import { client } from '@/lib/client';
 import { Button } from '@/components/ui/button';
+import { SelectLabel } from '@radix-ui/react-select';
 import { FolderTree } from 'lucide-react';
 
-export const Filters = ({ daysBehind, handleClick, disabled }: { daysBehind: number, handleClick: () => void, disabled: boolean }) => {
-    const { date: selectedDate, setDate } = useSelectDate()
+export const Filters = ({ daysBehind, handleClick }: { daysBehind: number, handleClick: () => void }) => {
+    const { date: selectedDate, setDate: setSelectedDate } = useSelectDate()
     const { region: selectedRegion, setSelectedRegion } = useSelectRegion()
     const { branch: selectedBranch, setSelectedBranch } = useSelectBranch()
     const { wok, setSelectedWok } = useSelectWok()
@@ -73,8 +74,24 @@ export const Filters = ({ daysBehind, handleClick, disabled }: { daysBehind: num
     };
 
     const handleDateChange = (date: Date | null) => {
-        const notNullDate = date ? new Date(date) : subDays(new Date(), daysBehind)
-        setDate(notNullDate)
+        const safeDate = date ?? new Date()
+        const selectedYear = getYear(safeDate);
+        const selectedMonth = getMonth(safeDate);
+
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+
+        // Check if the selected month/year is the current month/year
+        if (selectedYear === currentYear && selectedMonth === currentMonth) {
+            // For current month: use current day minus daysBehind (can roll to previous month)
+            const targetDate = subDays(today, daysBehind);
+            setSelectedDate(targetDate);
+        } else {
+            // For any other month: use the last day of that month
+            const lastDayOfSelectedMonth = getDaysInMonth(safeDate);
+            setSelectedDate(new Date(selectedYear, selectedMonth, lastDayOfSelectedMonth));
+        }
     }
 
     if (isLoading || !areas) {
@@ -135,7 +152,7 @@ export const Filters = ({ daysBehind, handleClick, disabled }: { daysBehind: num
                     selected={selectedDate ? selectedDate : subDays(new Date(), daysBehind)}
                     renderMonthContent={renderMonthContent}
                     onChange={(date) => handleDateChange(date)}
-                    dateFormat="yyyy-MM-dd"
+                    dateFormat="yyyy-MM"
                     maxDate={subDays(new Date(), daysBehind)}
                     minDate={new Date(2025, 0, 1)}
                     className="w-full text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -145,7 +162,7 @@ export const Filters = ({ daysBehind, handleClick, disabled }: { daysBehind: num
                     }
                     wrapperClassName="w-full"
                     showPopperArrow={false}
-                    showDateSelect
+                    showMonthYearPicker
                 />
             </div>
             <div className='space-y-2'>
@@ -175,7 +192,7 @@ export const Filters = ({ daysBehind, handleClick, disabled }: { daysBehind: num
                 </Select>
             </div>
             <div className="space-y-2 mt-auto">
-                <Button onClick={handleClick} disabled={!selectedBranch || disabled} className="cursor-pointer">
+                <Button onClick={handleClick} className="cursor-pointer">
                     <FolderTree />
                     Tampilkan data
                 </Button>
