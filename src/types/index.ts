@@ -269,43 +269,50 @@ export type DemandsDeploymentResponseData = {
     used_2mo_y: number;
     used_3mo_y: number;
     used_4mo_y: number;
-    used_1_6mo_y: number;
+    used_gt_6mo_y: number;
+    used_all_mo_y: number;
 
     amount_port_1mo_y: number;
     amount_port_2mo_y: number;
     amount_port_3mo_y: number;
     amount_port_4mo_y: number;
-    amount_port_1_6mo_y: number;
+    amount_port_gt_6mo_y: number;
+    amount_port_all_mo_y: number;
 
     used_1mo_y1: number;
     used_2mo_y1: number;
     used_3mo_y1: number;
     used_4mo_y1: number;
-    used_1_6mo_y1: number;
+    used_gt_6mo_y1: number;
+    used_all_mo_y1: number;
 
     amount_port_1mo_y1: number;
     amount_port_2mo_y1: number;
     amount_port_3mo_y1: number;
     amount_port_4mo_y1: number;
-    amount_port_1_6mo_y1: number;
+    amount_port_gt_6mo_y1: number;
+    amount_port_all_mo_y1: number;
 
     occ_1mo_y: string;
     occ_2mo_y: string;
     occ_3mo_y: string;
     occ_4mo_y: string;
-    occ_1_6mo_y: string;
+    occ_gt_6mo_y: string;
+    occ_all_mo_y: string;
 
     occ_1mo_y1: string;
     occ_2mo_y1: string;
     occ_3mo_y1: string;
     occ_4mo_y1: string;
-    occ_1_6mo_y1: string;
+    occ_gt_6mo_y1: string;
+    occ_all_mo_y1: string;
 
     occ_1mo_2y: string;
     occ_2mo_2y: string;
     occ_3mo_2y: string;
     occ_4mo_2y: string;
-    occ_1_6mo_2y: string;
+    occ_gt_6mo_2y: string;
+    occ_all_mo_2y: string;
 }
 
 export type RevenueC3mrResponseData = {

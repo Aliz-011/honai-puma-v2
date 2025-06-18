@@ -7,7 +7,7 @@ import { ChevronRight } from "lucide-react"
 
 import { SectionCards } from "./section-cards"
 import { BrownGreenChart, ChartPie, ProgressCard } from "./chart-component"
-import { Filters } from "../filter"
+import { Filters } from "./filter"
 import { FunnelingGroup, WOLoS } from "./funneling-group"
 import { SalesForce } from './sales-force'
 import { FalloutDetail } from "./fallout-detail"
@@ -20,8 +20,8 @@ import type { SalesFulfilmentResponseData } from '@/types'
 
 const Page = () => {
     const { date: selectedDate } = useSelectDate()
-    const { branch } = useSelectBranch()
-    const { wok } = useSelectWok()
+    const { branch, setSelectedBranch } = useSelectBranch()
+    const { wok, setSelectedWok } = useSelectWok()
     const [fetchDataClicked, setFetchDataClicked] = useState(false);
 
     const { data, isLoading, isError, error, refetch, isSuccess } = useQuery({
@@ -48,7 +48,7 @@ const Page = () => {
             const { data } = await response.json()
             return data
         },
-        enabled: false,
+        enabled: true,
         refetchOnWindowFocus: false,
         retry: 1,
         gcTime: 5 * 60 * 1000,
@@ -77,18 +77,21 @@ const Page = () => {
             const { data } = await response.json()
             return data
         },
-        enabled: false,
+        enabled: true,
         refetchOnWindowFocus: false,
         retry: 1,
         gcTime: 5 * 60 * 1000,
     })
 
     const handleClick = () => {
-        refetch()
-        refetchSf()
-        if (!fetchDataClicked) {
-            setFetchDataClicked(true);
-        }
+        // refetch()
+        // refetchSf()
+        // if (!fetchDataClicked) {
+        //     setFetchDataClicked(true);
+        // }
+
+        setSelectedBranch('')
+        setSelectedWok('')
     };
 
     const groupedData = useMemo(() => {
@@ -386,7 +389,7 @@ const Page = () => {
                         );
                     }
 
-                    if (fetchDataClicked && (isSuccess || isSfSuccess || isError) && !isDataActuallyAvailable) {
+                    if ((isSuccess || isSfSuccess || isError) && !isDataActuallyAvailable) {
                         return (
                             <div className="flex h-64 items-center justify-center">
                                 <div className="text-center">
@@ -394,19 +397,6 @@ const Page = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
                                     <p className="mt-2 text-gray-600 dark:text-gray-400">No data found for the selected filters.</p>
-                                </div>
-                            </div>
-                        );
-                    }
-
-                    if (!fetchDataClicked) {
-                        return (
-                            <div className="flex h-64 items-center justify-center">
-                                <div className="text-center">
-                                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                    </svg>
-                                    <p className="mt-2 text-gray-600 dark:text-gray-400">"Tampilkan data" to view reports.</p>
                                 </div>
                             </div>
                         );

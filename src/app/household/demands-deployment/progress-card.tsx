@@ -25,7 +25,7 @@ export const ProgressCard = ({ date, data, title }: ProgressCardParams) => {
     const currDate = format(endOfCurrMonth, 'dd MMM yyyy')
 
     return (
-        <div className="bg-white dark:bg-white/[0.03] rounded-lg shadow-md overflow-hidden w-full">
+        <div className="bg-white dark:bg-white/[0.03] rounded-lg shadow-md overflow-hidden w-full h-fit">
             <div className="bg-red-700 text-white p-3">
                 <h3 className="text-lg font-bold">{title}</h3>
             </div>
@@ -42,11 +42,11 @@ export const ProgressCard = ({ date, data, title }: ProgressCardParams) => {
                     <tbody>
                         {data.map((item, index) => (
                             <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                                <td className="px-3 py-2 font-medium">{item.label}</td>
+                                <td className="px-3 py-2 font-normal">{item.label}</td>
                                 <td className="px-3 py-2 text-right font-bold">{item.total_port}</td>
                                 <td className="px-3 py-2 text-right font-bold">{item.used_port}</td>
                                 <td className="px-3 py-2 text-right">
-                                    <span className={`px-2 py-1 font-bold`}>
+                                    <span className={`px-2 py-1 font-normal`}>
                                         {item.ach}
                                     </span>
                                 </td>
@@ -82,6 +82,35 @@ export const GoliveCard = ({ data, title }: {
                         </span>
                     </div>
                 ))}
+            </div>
+        </div>
+    )
+}
+
+export const DemandData = ({ data }: { data: { metric: string, value: number | string }[] }) => {
+    return (
+        <div className="bg-white rounded-xl p-6">
+            <div className="flex items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Demand Analysis</h2>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-gray-200">
+                            <th className="text-left p-3 text-sm font-semibold text-gray-600 uppercase tracking-wider">Metric</th>
+                            <th className="text-left p-3 text-sm font-semibold text-gray-600 uppercase tracking-wider">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.map((row, index) => (
+                            <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors last:border-none">
+                                <td className="p-3 text-gray-900 font-medium">{row.metric}</td>
+                                <td className="p-3 text-gray-900 font-semibold">{row.value}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     )

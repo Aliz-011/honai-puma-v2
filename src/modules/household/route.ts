@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { z } from "zod"
 
 import { zValidator } from "@/lib/validator-wrapper";
-import { targetHouseholdAll, summaryIoRePsBranch, summaryIoRePsWok, targetTerritoryDemands, summaryHouseholdC3mrBranch, summaryHouseholdC3mrSto, targetRevenueC3mr } from "@/db/schema/v_honai_puma";
+import { targetHouseholdAll, summaryIoRePsBranch, summaryIoRePsWok, targetTerritoryDemands, summaryHouseholdC3mrBranch, summaryHouseholdC3mrSto, targetRevenueC3mr, summaryIoRePsRegional } from "@/db/schema/v_honai_puma";
 import { dynamicIhAvailOdpA4, ih_demand_mysiis, ih_occ_golive_ihld, dynamicIhOrderingDetailOrderTable, ih_information_odp, dynamicIhC3mr } from '@/db/schema/household'
 import { territoryHousehold } from '@/db/schema/puma_2025'
 import { db } from "@/db";
@@ -37,6 +37,280 @@ const app = new Hono()
             const thisMonth = Number(format(selectedDate, 'M'))
             const prevMonth = thisMonth === 1 ? 12 : thisMonth - 1
             const remainingDays = daysInMonth - today
+
+            const regionalTerritory = db
+                .select({
+                    regional: territoryHousehold.regional
+                })
+                .from(territoryHousehold)
+                .where(eq(territoryHousehold.regional, 'MALUKU DAN PAPUA'))
+                .groupBy(sql`1`)
+                .as('a')
+
+            const summaryRegional = db
+                .select()
+                .from(summaryIoRePsRegional)
+                .where(and(
+                    eq(summaryIoRePsRegional.event_date, currDate),
+                    eq(summaryIoRePsRegional.channel, 'all'),
+                    eq(summaryIoRePsRegional.package, 'all'),
+                ))
+                .groupBy(summaryIoRePsRegional.regional)
+                .as('b')
+
+            const regionalTargetRevenue = db
+                .select({
+                    regional: territoryHousehold.regional,
+                    target_all_sales: sum(targetHouseholdAll.all_sales).as('target_all_sales'),
+                    target_grapari: sum(targetHouseholdAll.grapari).as('target_grapari'),
+                    target_agency: sum(targetHouseholdAll.agency).as('target_agency'),
+                    target_community: sum(targetHouseholdAll.community).as('target_community'),
+                    target_digital: sum(targetHouseholdAll.digital).as('target_digital'),
+                    target_greenfield: sum(targetHouseholdAll.greenfield).as('target_greenfield'),
+                    target_brownfield: sum(targetHouseholdAll.brownfield).as('target_brownfield')
+                })
+                .from(targetHouseholdAll)
+                .rightJoin(territoryHousehold, eq(targetHouseholdAll.territory, territoryHousehold.sto))
+                .where(eq(targetHouseholdAll.periode, yyyyMM))
+                .groupBy(territoryHousehold.regional)
+                .as('c')
+
+            const regionalPSByChannel = db
+                .select({
+                    regional: ihOrderingDetailOrder.region,
+                    grapari: sql<number>`ROUND(SUM(CASE WHEN order_channel IN ('k4', 'k3') THEN 1 ELSE 0 END) * 100.0 / COUNT(order_id), 2)`.as('grapari'),
+                    total_grapari: sql<number>`COUNT(CASE WHEN order_channel IN ('k4', 'k3') THEN order_id END)`.as('total_grapari'),
+
+                    indihome: sql<number>`ROUND(SUM(CASE WHEN order_channel IN ('b0') THEN 1 ELSE 0 END) * 100.0 / COUNT(order_id), 2)`.as('indihome'),
+                    total_digital: sql<number>`COUNT(CASE WHEN order_channel IN ('b0') THEN order_id END)`.as('total_digital'),
+
+                    lp_others: sql<number>`ROUND(SUM(CASE WHEN order_channel IN ('i1', 'a0', 's3', 'b3', 'u2', 'ab') THEN 1 ELSE 0 END) * 100.0 / COUNT(order_id), 2)`.as('lp_others'),
+                    total_community: sql<number>`COUNT(CASE WHEN order_channel IN ('i1', 'a0', 's3', 'b3', 'u2', 'ab') THEN order_id END)`.as('total_community'),
+
+                    sales_force: sql<number>`ROUND(SUM(CASE WHEN order_channel IN ('i4') THEN 1 ELSE 0 END) * 100.0 / COUNT(order_id), 2)`.as('sales_force'),
+                    total_agency: sql<number>`COUNT(CASE WHEN order_channel IN ('i4') THEN order_id END)`.as('total_agency')
+                })
+                .from(ihOrderingDetailOrder)
+                .where(and(
+                    eq(ihOrderingDetailOrder.region, 'MALUKU DAN PAPUA'),
+                    eq(ihOrderingDetailOrder.order_type, 'NEW SALES'),
+                    inArray(ihOrderingDetailOrder.funneling_group, ['COMPLETED', 'PS']),
+                    sql`DATE_FORMAT(${ihOrderingDetailOrder.ps_ts}, '%Y-%m-%d') BETWEEN ${currStartOfMonth} AND ${currDate}`
+                ))
+                .groupBy(sql`1`)
+                .as('d')
+
+            const regionalBrownGreen = db
+                .select({
+                    regional: ihOrderingDetailOrder.region,
+                    greenfield: sql<number>`COUNT(CASE WHEN (${ih_occ_golive_ihld.odp_name} IS NOT NULL AND ${ih_occ_golive_ihld.tahun_program} = 2025 AND YEAR(${ih_occ_golive_ihld.tanggal_go_live_uim}) = 2025) THEN ${ihOrderingDetailOrder.order_id} END)`.as('greenfield'),
+                    brownfield: sql<number>`COUNT(CASE WHEN (${ih_occ_golive_ihld.odp_name} IS NOT NULL AND ${ih_occ_golive_ihld.tahun_program} = 2024 AND YEAR(${ih_occ_golive_ihld.tanggal_go_live_uim}) = 2024) THEN ${ihOrderingDetailOrder.order_id} END)`.as('brownfield'),
+                })
+                .from(ihOrderingDetailOrder)
+                .leftJoin(ih_information_odp, eq(ihOrderingDetailOrder.service_id, ih_information_odp.service_number))
+                .leftJoin(ih_occ_golive_ihld, eq(ih_information_odp.odp_name, ih_occ_golive_ihld.odp_name))
+                .where(and(
+                    or(eq(ihOrderingDetailOrder.region, 'MALUKU DAN PAPUA'), eq(ih_occ_golive_ihld.telkomsel_regional, 'PUMA')),
+                    isNotNull(ihOrderingDetailOrder.ps_ts),
+                    sql`DATE_FORMAT(${ihOrderingDetailOrder.ps_ts}, '%Y-%m-%d') BETWEEN ${currStartOfMonth} AND ${currDate}`
+                ))
+                .groupBy(sql`1`)
+                .as('e')
+
+            const regionalDeduplicatedData = db
+                .select({
+                    ...getTableColumns(ihOrderingDetailOrder),
+                    duplicate_count: sql<number>`COUNT(*) OVER (PARTITION BY service_id)`.as('duplicate_count'),
+                    completed_flag: sql<number>`SUM(CASE WHEN funneling_group IN ('COMPLETED', 'PS', 'CANCELLED') THEN 1 ELSE 0 END) OVER (PARTITION BY service_id)`.as('completed_flag')
+                })
+                .from(ihOrderingDetailOrder)
+                .where(and(
+                    eq(ihOrderingDetailOrder.region, 'MALUKU DAN PAPUA'),
+                    eq(ihOrderingDetailOrder.order_type, 'NEW SALES'),
+                    sql`DATE_FORMAT(${ihOrderingDetailOrder.re_ts}, '%Y-%m-%d') BETWEEN ${prevStartOfMonth} AND ${currDate}`,
+                ))
+                .as('deduplicated_data')
+
+            const regionalFinalDeduplicatedData = db
+                .select()
+                .from(regionalDeduplicatedData)
+                .where(and(
+                    eq(regionalDeduplicatedData.duplicate_count, 1),
+                    eq(regionalDeduplicatedData.completed_flag, 0),
+                    notInArray(regionalDeduplicatedData.funneling_group, ['COMPLETED', 'PS', 'CANCELLED'])
+                ))
+                .as('final_deduplicated')
+
+            const regionalReNonPS = db
+                .select({
+                    regional: regionalFinalDeduplicatedData.region,
+                    registration: sql<number>`COUNT(CASE WHEN funneling_group = 'REGISTRATION' THEN order_id END)`.as('registration'),
+                    provision_issued: sql<number>`COUNT(CASE WHEN funneling_group = 'PROVISION_ISSUED' THEN order_id END)`.as('provision_issued'),
+                    provision_completed: sql<number>`COUNT(CASE WHEN funneling_group = 'PROVISION_COMPLETED' THEN order_id END)`.as('provision_completed'),
+                    activation_completed: sql<number>`COUNT(CASE WHEN funneling_group = 'ACTIVATION_COMPLETED' THEN order_id END)`.as('activation_completed'),
+                    fallout: sql<number>`COUNT(CASE WHEN funneling_group = 'FALLOUT' THEN order_id END)`.as('fallout'),
+                    cancelled: sql<number>`COUNT(CASE WHEN funneling_group = 'CANCELLED' THEN order_id END)`.as('cancelled'),
+                    total: sql<number>`COUNT(CASE WHEN funneling_group IN ('REGISTRATION', 'PROVISION_ISSUED', 'PROVISION_COMPLETED', 'ACTIVATION_COMPLETED', 'FALLOUT', 'CANCELLED') THEN order_id END)`.as('total'),
+
+                    kendala_pelanggan: sql<number>`COUNT(CASE WHEN funneling_group = 'FALLOUT' AND fallout_category = 'KENDALA PELANGGAN' THEN order_id END)`.as('kendala_pelanggan'),
+                    kendala_sistem: sql<number>`COUNT(CASE WHEN funneling_group = 'FALLOUT' AND fallout_category = 'KENDALA SISTEM' THEN order_id END)`.as('kendala_sistem'),
+                    kendala_teknik: sql<number>`COUNT(CASE WHEN funneling_group = 'FALLOUT' AND fallout_category = 'KENDALA TEKNIK' THEN order_id END)`.as('kendala_teknik'),
+                    kendala_others: sql<number>`COUNT(CASE WHEN funneling_group = 'FALLOUT' AND fallout_category IN ('OTHERS', 'KENDALA LAINNYA') THEN order_id END)`.as('kendala_others'),
+                    total_all_kendala: sql<number>`COUNT(CASE WHEN funneling_group = 'FALLOUT' AND fallout_category IN ('KENDALA PELANGGAN', 'KENDALA TEKNIK', 'KENDALA SISTEM', 'OTHERS', 'KENDALA LAINNYA') THEN order_id END)`.as('total_all_kendala'),
+
+                    // KENDALA PELANGGAN
+                    INDIKASI_CABUT_PASANG: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA PELANGGAN' AND fallout_subcategory = 'INDIKASI CABUT PASANG' THEN order_id END)`.as('INDIKASI_CABUT_PASANG'),
+                    PENDING: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA PELANGGAN' AND fallout_subcategory = 'PENDING' THEN order_id END)`.as('PENDING'),
+                    PELANGGAN_MASIH_RAGU: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA PELANGGAN' AND fallout_subcategory = 'PELANGGAN MASIH RAGU' THEN order_id END)`.as('PELANGGAN_MASIH_RAGU'),
+                    RNA: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA PELANGGAN' AND fallout_subcategory = 'RNA' THEN order_id END)`.as('RNA'),
+                    KENDALA_IZIN: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA PELANGGAN' AND fallout_subcategory = 'KENDALA IZIN' THEN order_id END)`.as('KENDALA_IZIN'),
+                    BATAL: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA PELANGGAN' AND fallout_subcategory = 'BATAL' THEN order_id END)`.as('BATAL'),
+                    RUMAH_KOSONG: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA PELANGGAN' AND fallout_subcategory = 'RUMAH KOSONG' THEN order_id END)`.as('RUMAH_KOSONG'),
+                    DOUBLE_INPUT: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA PELANGGAN' AND fallout_subcategory = 'DOUBLE INPUT' THEN order_id END)`.as('DOUBLE_INPUT'),
+                    GANTI_PAKET: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA PELANGGAN' AND fallout_subcategory = 'GANTI PAKET' THEN order_id END)`.as('GANTI_PAKET'),
+                    ALAMAT_TIDAK_DITEMUKAN: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA PELANGGAN' AND fallout_subcategory = 'ALAMAT TIDAK DITEMUKAN' THEN order_id END)`.as('ALAMAT_TIDAK_DITEMUKAN'),
+
+                    // KENDALA TEKNIK
+                    SALAH_TAGGING: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'SALAH TAGGING' THEN order_id END)`.as('SALAH_TAGGING'),
+                    ODP_RUSAK: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'ODP RUSAK' THEN order_id END)`.as("ODP_RUSAK"),
+                    ODP_FULL: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'ODP FULL' THEN order_id END)`.as("ODP_FULL"),
+                    TIANG: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'TIANG' THEN order_id END)`.as("TIANG"),
+                    CROSS_JALAN: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'CROSS JALAN' THEN order_id END)`.as("CROSS_JALAN"),
+                    TIDAK_ADA_ODP: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'TIDAK ADA ODP' THEN order_id END)`.as("TIDAK_ADA_ODP"),
+                    ODP_JAUH: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'ODP JAUH' THEN order_id END)`.as("ODP_JAUH"),
+                    ODP_BELUM_GO_LIVE: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'ODP BELUM GO LIVE' THEN order_id END)`.as('ODP_BELUM_GO_LIVE'),
+                    ODP_RETI: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'ODP RETI' THEN order_id END)`.as('ODP_RETI'),
+                    LIMITASI_ONU: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'LIMITASI ONU' THEN order_id END)`.as('LIMITASI_ONU'),
+                    JALUR_RUTE: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory IN ('KENDALA JALUR/RUTE TARIKAN', 'KENDALA JALUR/RUTE', 'KENDALA JALUR') THEN order_id END)`.as('JALUR_RUTE'),
+                    KENDALA_IKR_IKG: sql<number>`COUNT(CASE WHEN fallout_category = 'KENDALA TEKNIK' AND fallout_subcategory = 'KENDALA IKR/IKG' THEN order_id END)`.as('KENDALA_IKR_IKG'),
+
+                    // -LoS
+                    wo_3: sql<number>`COUNT(CASE WHEN FLOOR(provi_duration) BETWEEN 0 AND 3 THEN order_id END)`.as('wo_3'),
+                    wo_3_per: sql<string>`CONCAT(ROUND(SUM(CASE WHEN FLOOR(provi_duration) BETWEEN 0 AND 3 THEN 1 ELSE 0 END) * 100 / COUNT(order_id), 2), '%')`.as('wo_3_per'),
+                    wo_4_7: sql<number>`COUNT(CASE WHEN FLOOR(provi_duration) BETWEEN 4 AND 7 THEN order_id END)`.as('wo_4_7'),
+                    wo_4_7_per: sql<string>`CONCAT(ROUND(SUM(CASE WHEN FLOOR(provi_duration) BETWEEN 4 AND 7 THEN 1 ELSE 0 END) * 100 / COUNT(order_id), 2), '%')`.as('wo_4_7_per'),
+                    wo_8_14: sql<number>`COUNT(CASE WHEN FLOOR(provi_duration) BETWEEN 8 AND 14 THEN order_id END)`.as('wo_8_14'),
+                    wo_8_14_per: sql<string>`CONCAT(ROUND(SUM(CASE WHEN FLOOR(provi_duration) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) * 100 / COUNT(order_id), 2), '%')`.as('wo_8_14_per'),
+                    wo_15_30: sql<number>`COUNT(CASE WHEN FLOOR(provi_duration) BETWEEN 15 AND 30 THEN order_id END)`.as('wo_15_30'),
+                    wo_15_30_per: sql<string>`CONCAT(ROUND(SUM(CASE WHEN FLOOR(provi_duration) BETWEEN 15 AND 30 THEN 1 ELSE 0 END) * 100 / COUNT(order_id), 2), '%')`.as('wo_15_30_per'),
+                    wo_gt_30: sql<number>`COUNT(CASE WHEN FLOOR(provi_duration) > 30 THEN order_id END)`.as('wo_gt_30'),
+                    wo_gt_30_per: sql<string>`CONCAT(ROUND(SUM(CASE WHEN FLOOR(provi_duration) > 30 THEN 1 ELSE 0 END) * 100 / COUNT(order_id), 2), '%')`.as('wo_gt_30_per'),
+                    total_wo: sql<number>`COUNT(CASE WHEN provi_duration IS NOT NULL THEN order_id END)`.as('total_wo')
+                })
+                .from(regionalFinalDeduplicatedData)
+                .groupBy(sql`1`)
+                .as('f')
+
+            const revenueRegional = db
+                .select({
+                    name: regionalTerritory.regional,
+                    target_all_sales: sql<number>`ROUND(SUM(${regionalTargetRevenue.target_all_sales}),2)`.as('target_all_sales'),
+                    level: sql<string>`'regional'`.as('level'),
+
+                    ach_target_fm_io_all_sales: sql<number>`ROUND((SUM(${summaryRegional.io_m})/SUM(${regionalTargetRevenue.target_all_sales}))*100, 2)`.as('ach_target_fm_io_all_sales'),
+                    drr_io: sql<number>`ROUND((SUM(${summaryRegional.io_m})/(${today}/${daysInMonth}*SUM(${regionalTargetRevenue.target_all_sales})))*100, 2)`.as('drr_io'),
+                    io_m: sql<number>`ROUND(SUM(${summaryRegional.io_m}),2)`.as('io_m'),
+                    io_mom: sql<string>`CONCAT(${summaryRegional.io_mom}, '%')`.as('io_mom'),
+                    io_gap_daily: sql<number>`ROUND(SUM(${summaryRegional.io_gap_daily}),2)`.as('io_gap_daily'),
+
+                    ach_target_fm_re_all_sales: sql<number>`ROUND((SUM(${summaryRegional.re_m})/SUM(${regionalTargetRevenue.target_all_sales}))*100, 2)`.as('ach_target_fm_re_all_sales'),
+                    drr_re: sql<number>`ROUND((SUM(${summaryRegional.re_m})/(${today}/${daysInMonth}*SUM(${regionalTargetRevenue.target_all_sales})))*100, 2)`.as('drr_re'),
+                    re_m: sql<number>`ROUND(SUM(${summaryRegional.re_m}),2)`.as('re_m'),
+                    re_mom: sql<string>`CONCAT(${summaryRegional.re_mom}, '%')`.as('re_mom'),
+                    re_gap_daily: sql<number>`ROUND(SUM(${summaryRegional.re_gap_daily}),2)`.as('re_gap_daily'),
+
+                    ach_target_fm_ps_all_sales: sql<number>`ROUND((SUM(${summaryRegional.ps_m})/SUM(${regionalTargetRevenue.target_all_sales}))*100, 2)`.as('ach_target_fm_ps_all_sales'),
+                    drr_ps: sql<number>`ROUND((SUM(${summaryRegional.ps_m})/(${today}/${daysInMonth}*SUM(${regionalTargetRevenue.target_all_sales})))*100, 2)`.as('drr_ps'),
+                    target_daily_ps: sql<number>`ROUND(SUM(${regionalTargetRevenue.target_all_sales}/${daysInMonth}), 2)`.as('target_daily_ps'),
+                    ach_daily_ps: sql<number>`ROUND(SUM(${summaryRegional.ps_m}/${today}), 2)`.as('ach_daily_ps'),
+                    ps_gap_daily: sql<number>`ROUND(SUM(${summaryRegional.ps_gap_daily}), 2)`.as('ps_gap_daily'),
+                    daily_ps_remaining: sql<number>`ROUND(SUM(${regionalTargetRevenue.target_all_sales} - ${summaryRegional.ps_m})/${remainingDays},2)`.as('daily_ps_remaining'),
+                    ps_m: sql<number>`ROUND(SUM(${summaryRegional.ps_m}),2)`.as('ps_m'),
+                    ps_mom: sql<string>`CONCAT(${summaryRegional.ps_mom}, '%')`.as('ps_mom'),
+                    ps_to_io: sql<number>`CONCAT(${summaryRegional.ps_to_io}, '%')`.as('ps_to_io'),
+                    ps_to_re: sql<number>`CONCAT(${summaryRegional.ps_to_re}, '%')`.as('ps_to_re'),
+
+                    ach_fm_indihome: sql<string>`CONCAT(d.indihome,'%')`.as('ach_fm_indihome'),
+                    ps_indihome: sql<number>`ROUND(d.total_digital, 2)`.as('ps_indihome'),
+                    ach_fm_grapari: sql<string>`CONCAT(d.grapari,'%')`.as('ach_fm_grapari'),
+                    ps_grapari: sql<number>`ROUND(d.total_grapari, 2)`.as('ps_grapari'),
+                    ach_fm_community: sql<string>`CONCAT(d.lp_others,'%')`.as('ach_fm_community'),
+                    ps_community: sql<number>`ROUND(d.total_community, 2)`.as('ps_community'),
+                    ach_fm_agency: sql<string>`CONCAT(d.sales_force,'%')`.as('ach_fm_agency'),
+                    ps_sales_force: sql<number>`ROUND(d.total_agency, 2)`.as('ps_agency'),
+
+                    brownfield: sql<number>`ROUND(SUM(e.brownfield), 2)`.as('brownfield'),
+                    target_brownfield: sql<number>`ROUND(SUM(c.target_brownfield),2)`.as('target_brownfield'),
+                    ach_fm_brownfield: sql<string>`CONCAT(ROUND((SUM(e.brownfield)/SUM(c.target_brownfield))*100, 2), '%')`.as('ach_fm_brownfield'),
+                    drr_brownfield: sql<string>`CONCAT(ROUND((SUM(e.brownfield)/(${today}/${daysInMonth}*SUM(c.target_brownfield)))*100, 2), '%')`.as('drr_brownfield'),
+                    greenfield: sql<number>`ROUND(SUM(e.greenfield), 2)`.as('greenfield'),
+                    target_greenfield: sql<number>`ROUND(SUM(c.target_greenfield),2)`.as('target_greenfield'),
+                    ach_fm_greenfield: sql<string>`CONCAT(ROUND((SUM(e.greenfield)/SUM(c.target_greenfield))*100, 2), '%')`.as('ach_fm_greenfield'),
+                    drr_greenfield: sql<string>`CONCAT(ROUND((SUM(e.greenfield)/(${today}/${daysInMonth}*SUM(c.target_greenfield)))*100, 2), '%')`.as('drr_greenfield'),
+
+                    registration: regionalReNonPS.registration,
+                    provision_issued: regionalReNonPS.provision_issued,
+                    provision_completed: regionalReNonPS.provision_completed,
+                    activation_completed: regionalReNonPS.activation_completed,
+                    fallout: regionalReNonPS.fallout,
+                    cancelled: regionalReNonPS.cancelled,
+                    registration_per: sql<string>`CONCAT(ROUND(f.registration / f.total * 100.0, 2),'%')`.as('registration_per'),
+                    provision_issued_per: sql<string>`CONCAT(ROUND(f.provision_issued / f.total * 100.0, 2), '%')`.as('provision_issued_per'),
+                    provision_completed_per: sql<string>`CONCAT(ROUND(f.provision_completed / f.total * 100.0, 2), '%')`.as('provision_completed_per'),
+                    activation_completed_per: sql<string>`CONCAT(ROUND(f.activation_completed / f.total * 100.0, 2), '%')`.as('activation_completed_per'),
+                    fallout_per: sql<string>`CONCAT(ROUND(f.fallout / f.total * 100.0, 2), '%')`.as('fallout_per'),
+                    cancelled_per: sql<string>`CONCAT(ROUND(f.cancelled / f.total * 100.0, 2), '%')`.as('cancelled_per'),
+                    total_re_non_ps: sql<number>`f.total`.as('total_re_non_ps'),
+
+                    kendala_pelanggan: regionalReNonPS.kendala_pelanggan,
+                    kendala_sistem: regionalReNonPS.kendala_sistem,
+                    kendala_teknik: regionalReNonPS.kendala_teknik,
+                    kendala_others: regionalReNonPS.kendala_others,
+                    total_all_kendala: regionalReNonPS.total_all_kendala,
+
+                    INDIKASI_CABUT_PASANG: regionalReNonPS.INDIKASI_CABUT_PASANG,
+                    PENDING: regionalReNonPS.PENDING,
+                    PELANGGAN_MASIH_RAGU: regionalReNonPS.PELANGGAN_MASIH_RAGU,
+                    RNA: regionalReNonPS.RNA,
+                    KENDALA_IZIN: regionalReNonPS.KENDALA_IZIN,
+                    BATAL: regionalReNonPS.BATAL,
+                    RUMAH_KOSONG: regionalReNonPS.RUMAH_KOSONG,
+                    DOUBLE_INPUT: regionalReNonPS.DOUBLE_INPUT,
+                    GANTI_PAKET: regionalReNonPS.GANTI_PAKET,
+                    ALAMAT_TIDAK_DITEMUKAN: regionalReNonPS.ALAMAT_TIDAK_DITEMUKAN,
+
+                    SALAH_TAGGING: regionalReNonPS.SALAH_TAGGING,
+                    ODP_RUSAK: regionalReNonPS.ODP_RUSAK,
+                    ODP_FULL: regionalReNonPS.ODP_FULL,
+                    TIANG: regionalReNonPS.TIANG,
+                    CROSS_JALAN: regionalReNonPS.CROSS_JALAN,
+                    TIDAK_ADA_ODP: regionalReNonPS.TIDAK_ADA_ODP,
+                    ODP_JAUH: regionalReNonPS.ODP_JAUH,
+                    ODP_BELUM_GO_LIVE: regionalReNonPS.ODP_BELUM_GO_LIVE,
+                    ODP_RETI: regionalReNonPS.ODP_RETI,
+                    LIMITASI_ONU: regionalReNonPS.LIMITASI_ONU,
+                    JALUR_RUTE: regionalReNonPS.JALUR_RUTE,
+                    KENDALA_IKR_IKG: regionalReNonPS.KENDALA_IKR_IKG,
+
+                    wo_3: regionalReNonPS.wo_3,
+                    wo_3_per: regionalReNonPS.wo_3_per,
+                    wo_4_7: regionalReNonPS.wo_4_7,
+                    wo_4_7_per: regionalReNonPS.wo_4_7_per,
+                    wo_8_14: regionalReNonPS.wo_8_14,
+                    wo_8_14_per: regionalReNonPS.wo_8_14_per,
+                    wo_15_30: regionalReNonPS.wo_15_30,
+                    wo_15_30_per: regionalReNonPS.wo_15_30_per,
+                    wo_gt_30: regionalReNonPS.wo_gt_30,
+                    wo_gt_30_per: regionalReNonPS.wo_gt_30_per,
+                    total_wo: regionalReNonPS.total_wo
+                })
+                .from(regionalTerritory)
+                .leftJoin(summaryRegional, eq(regionalTerritory.regional, summaryRegional.regional))
+                .leftJoin(regionalTargetRevenue, eq(summaryRegional.regional, regionalTargetRevenue.regional))
+                .leftJoin(regionalPSByChannel, eq(regionalTerritory.regional, regionalPSByChannel.regional))
+                .leftJoin(regionalBrownGreen, eq(regionalTerritory.regional, regionalBrownGreen.regional))
+                .leftJoin(regionalReNonPS, eq(regionalTerritory.regional, regionalReNonPS.regional))
+                .groupBy(regionalTerritory.regional)
 
             const branchTerritory = db
                 .select({
@@ -639,8 +913,16 @@ const app = new Hono()
                 return c.json({ data: finalDataRevenue })
             }
 
+            if (branch) {
+                const [finalDataRevenue] = await Promise.all([
+                    revenueBranch
+                ])
+
+                return c.json({ data: finalDataRevenue })
+            }
+
             const [finalDataRevenue] = await Promise.all([
-                revenueBranch
+                revenueRegional
             ])
 
             return c.json({ data: finalDataRevenue })
@@ -681,6 +963,367 @@ const app = new Hono()
 
             const currJanuaryFirst = `${currYear}-01-01`
             const prevJanuaryFirst = `${prevYear}-01-01`
+
+            const regionalTerritory = db
+                .select({ regional: territoryHousehold.regional })
+                .from(territoryHousehold)
+                .where(eq(territoryHousehold.regional, 'MALUKU DAN PAPUA'))
+                .groupBy(territoryHousehold.regional)
+                .as('a')
+
+            const regionalCurrOdp = db
+                .select({
+                    regional: sql<string>`bb.regional`.as('regional'),
+                    used_black: sql<number>`SUM(CASE WHEN status = 'BLACK' THEN used END)`.as('used_black'),
+                    used_red: sql<number>`SUM(CASE WHEN status = 'RED' THEN used END)`.as('used_red'),
+                    used_yellow: sql<number>`SUM(CASE WHEN status = 'YELLOW' THEN used END)`.as('used_yellow'),
+                    used_green: sql<number>`SUM(CASE WHEN status = 'GREEN' THEN used END)`.as('used_green'),
+                    used: sql<number>`SUM(used)`.as('used'),
+
+                    avai_port_black: sql<number>`SUM(CASE WHEN status = 'BLACK' THEN avai_port END)`.as('avai_port_black'),
+                    avai_port_red: sql<number>`SUM(CASE WHEN status = 'RED' THEN avai_port END)`.as('avai_port_red'),
+                    avai_port_yellow: sql<number>`SUM(CASE WHEN status = 'YELLOW' THEN avai_port END)`.as('avai_port_yellow'),
+                    avai_port_green: sql<number>`SUM(CASE WHEN status = 'GREEN' THEN avai_port END)`.as('avai_port_green'),
+                    avai_port: sql<number>`SUM(avai_port)`.as('avai_port'),
+
+                    amount_port_black: sql<number>`SUM(CASE WHEN status = 'BLACK' THEN amount_port END)`.as('amount_port_black'),
+                    amount_port_red: sql<number>`SUM(CASE WHEN status = 'RED' THEN amount_port END)`.as('amount_port_red'),
+                    amount_port_yellow: sql<number>`SUM(CASE WHEN status = 'YELLOW' THEN amount_port END)`.as('amount_port_yellow'),
+                    amount_port_green: sql<number>`SUM(CASE WHEN status = 'GREEN' THEN amount_port END)`.as('amount_port_green'),
+                    amount_port: sql<number>`SUM(amount_port)`.as('amount_port'),
+
+                    total_odp_black: sql<number>`SUM(CASE WHEN status = 'BLACK' THEN odp END)`.as('total_odp_black'),
+                    total_odp_red: sql<number>`SUM(CASE WHEN status = 'RED' THEN odp END)`.as('total_odp_red'),
+                    total_odp_yellow: sql<number>`SUM(CASE WHEN status = 'YELLOW' THEN odp END)`.as('total_odp_yellow'),
+                    total_odp_green: sql<number>`SUM(CASE WHEN status = 'GREEN' THEN odp END)`.as('total_odp_green'),
+                    total_odp: sql<number>`SUM(bb.odp)`.as('total_odp')
+                })
+                .from(db
+                    .select({
+                        regional: sql<string>`'MALUKU DAN PAPUA'`.as('regional'),
+                        status: sql<string>`
+                    CASE
+                        WHEN ${currOdpTable.status} IN ('BLACK', 'BLACKSYSTEM') THEN 'BLACK' ELSE ${currOdpTable.status}
+                    END`.as('status'),
+                        amount_port: sum(currOdpTable.is_total).as('amount_port'),
+                        avai_port: sum(currOdpTable.avai).as('avai_port'),
+                        used: sum(currOdpTable.used).as('used'),
+                        odp: count(currOdpTable.status).as('odp')
+                    })
+                    .from(currOdpTable)
+                    .where(inArray(currOdpTable.witel, ['MALUKU', 'PAPUA', 'PAPUA BARAT']))
+                    .groupBy(sql`1,2`)
+                    .as('bb')
+                )
+                .groupBy(sql`1`)
+                .as('b')
+
+            const regionalPrevOdp = db
+                .select({
+                    regional: sql<string>`cc.regional`.as('regional'),
+                    used_black: sql<number>`SUM(CASE WHEN status = 'BLACK' THEN used END)`.as('used_black'),
+                    used_red: sql<number>`SUM(CASE WHEN status = 'RED' THEN used END)`.as('used_red'),
+                    used_yellow: sql<number>`SUM(CASE WHEN status = 'YELLOW' THEN used END)`.as('used_yellow'),
+                    used_green: sql<number>`SUM(CASE WHEN status = 'GREEN' THEN used END)`.as('used_green'),
+                    used: sql<number>`SUM(used)`.as('used'),
+
+                    amount_port_black: sql<number>`SUM(CASE WHEN status = 'BLACK' THEN amount_port END)`.as('amount_port_black'),
+                    amount_port_red: sql<number>`SUM(CASE WHEN status = 'RED' THEN amount_port END)`.as('amount_port_red'),
+                    amount_port_yellow: sql<number>`SUM(CASE WHEN status = 'YELLOW' THEN amount_port END)`.as('amount_port_yellow'),
+                    amount_port_green: sql<number>`SUM(CASE WHEN status = 'GREEN' THEN amount_port END)`.as('amount_port_green'),
+                    amount_port: sql<number>`SUM(amount_port)`.as('amount_port'),
+                })
+                .from(db
+                    .select({
+                        regional: sql<string>`'MALUKU DAN PAPUA'`.as('regional'),
+                        status: sql<string>`
+                    CASE
+                        WHEN ${prevOdpTable.status} IN ('BLACK', 'BLACKSYSTEM') THEN 'BLACK' ELSE ${prevOdpTable.status}
+                    END`.as('status'),
+                        used: sum(prevOdpTable.used).as('used'),
+                        amount_port: sum(prevOdpTable.is_total).as('amount_port')
+                    })
+                    .from(prevOdpTable)
+                    .where(inArray(prevOdpTable.witel, ['MALUKU', 'PAPUA', 'PAPUA BARAT']))
+                    .groupBy(sql`1,2`)
+                    .as('cc')
+                )
+                .groupBy(sql`1`)
+                .as('c');
+
+            const regionalGoLive = db
+                .select({
+                    regional: sql<string>`CASE WHEN telkomsel_regional IN ('PUMA', 'MALUKU DAN PAPUA') THEN 'MALUKU DAN PAPUA' END`.as('regional'),
+                    golive_m: sql<number>`COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${currStartOfMonth} AND ${currDate} THEN 1 END)`.as('golive_m'),
+                    golive_m1: sql<number>`COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${prevStartOfMonth} AND ${prevDate2} THEN 1 END)`.as('golive_m1'),
+
+                    // Add y and y1 calculations here directly
+                    golive_y: sql<number>`COUNT(CASE WHEN tahun_go_live_uim = 2025 THEN 1 END)`.as('golive_y'),
+                    golive_y1: sql<number>`COUNT(CASE WHEN tahun_go_live_uim = 2024 THEN 1 END)`.as('golive_y1'),
+
+                    golive_ytd: sql<number>`COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${currJanuaryFirst} AND ${currDate} THEN 1 END)`.as('golive_ytd'),
+                    golive_ytd1: sql<number>`COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${prevJanuaryFirst} AND ${prevYearCurrDate} THEN 1 END)`.as('golive_ytd1'),
+
+                    // Calculate MoM and YoY percentages here as well
+                    golive_mom: sql<string>`CONCAT(COALESCE(ROUND((COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${currStartOfMonth} AND ${currDate} THEN 1 END) - COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${prevStartOfMonth} AND ${prevDate2} THEN 1 END)) / COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${prevStartOfMonth} AND ${prevDate2} THEN 1 END) * 100, 2),0), '%')`.as('golive_mom'),
+                    golive_yoy: sql<string>`CONCAT(COALESCE(ROUND((COUNT(CASE WHEN tahun_go_live_uim = 2025 THEN 1 END) - COUNT(CASE WHEN tahun_go_live_uim = 2024 THEN 1 END)) / COUNT(CASE WHEN tahun_go_live_uim = 2024 THEN 1 END) * 100, 2),0), '%')`.as('golive_yoy'),
+                    golive_ytd_per: sql<string>`CONCAT(COALESCE(ROUND((COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${currJanuaryFirst} AND ${currDate} THEN 1 END) - COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${prevJanuaryFirst} AND ${prevYearCurrDate} THEN 1 END)) / COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${prevJanuaryFirst} AND ${prevYearCurrDate} THEN 1 END) * 100, 2),0), '%')`.as('golive_ytd_per'),
+                })
+                .from(ih_occ_golive_ihld)
+                .groupBy(sql`1`)
+                .as('d')
+
+            const regionalDemands = db
+                .select({
+                    regional: ih_demand_mysiis.region,
+                    demand_created_mtd: sql<number>`SUM(CASE WHEN MONTH(approved_at) = ${currMonth} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_mtd'),
+                    demand_created_m1: sql<number>`SUM(CASE WHEN MONTH(approved_at) = ${prevMonth} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_m1'),
+                })
+                .from(ih_demand_mysiis)
+                .where(and(
+                    gt(ih_demand_mysiis.target, 0),
+                    gt(ih_demand_mysiis.valid, 0),
+                    eq(ih_demand_mysiis.region, 'MALUKU DAN PAPUA'),
+                    sql`YEAR(${ih_demand_mysiis.approved_at}) = ${currYear}`
+                ))
+                .groupBy(sql`1`)
+                .as('e')
+
+            const regionalGoLiveCurrYear = db
+                .select({
+                    regional: sql<string>`ff.telkomsel_regional`.as('regional'),
+
+                    avai_port_1mo_y: sql<number>`COALESCE(ff.avai_port_1mo_y, 0)`.as('avai_port_1mo_y'),
+                    avai_port_2mo_y: sql<number>`COALESCE(ff.avai_port_2mo_y, 0)`.as('avai_port_2mo_y'),
+                    avai_port_3mo_y: sql<number>`COALESCE(ff.avai_port_3mo_y, 0)`.as('avai_port_3mo_y'),
+                    avai_port_4mo_y: sql<number>`COALESCE(ff.avai_port_4mo_y, 0)`.as('avai_port_4mo_y'),
+
+                    used_1mo_y: sql<number>`COALESCE(ff.used_1mo_y, 0)`.as('used_1mo_y'),
+                    used_2mo_y: sql<number>`COALESCE(ff.used_2mo_y, 0)`.as('used_2mo_y'),
+                    used_3mo_y: sql<number>`COALESCE(ff.used_3mo_y, 0)`.as('used_3mo_y'),
+                    used_4mo_y: sql<number>`COALESCE(ff.used_4mo_y, 0)`.as('used_4mo_y'),
+                    used_gt_6mo_y: sql<number>`COALESCE(ff.used_gt_6mo_y, 0)`.as('used_gt_6mo_y'),
+                    used_all_mo_y: sql<number>`COALESCE(ff.used_all_mo_y, 0)`.as('used_all_mo_y'),
+
+                    amount_port_1mo_y: sql<number>`COALESCE(ff.amount_port_1mo_y, 0)`.as('amount_port_1mo_y'),
+                    amount_port_2mo_y: sql<number>`COALESCE(ff.amount_port_2mo_y, 0)`.as('amount_port_2mo_y'),
+                    amount_port_3mo_y: sql<number>`COALESCE(ff.amount_port_3mo_y, 0)`.as('amount_port_3mo_y'),
+                    amount_port_4mo_y: sql<number>`COALESCE(ff.amount_port_4mo_y, 0)`.as('amount_port_4mo_y'),
+                    amount_port_gt_6mo_y: sql<number>`COALESCE(ff.amount_port_gt_6mo_y, 0)`.as('amount_port_gt_6mo_y'),
+                    amount_port_all_mo_y: sql<number>`COALESCE(ff.amount_port_all_mo_y, 0)`.as('amount_port_all_mo_y'),
+
+                    used_1mo_y1: sql<number>`COALESCE(ff.used_1mo_y1, 0)`.as('used_1mo_y1'),
+                    used_2mo_y1: sql<number>`COALESCE(ff.used_2mo_y1, 0)`.as('used_2mo_y1'),
+                    used_3mo_y1: sql<number>`COALESCE(ff.used_3mo_y1, 0)`.as('used_3mo_y1'),
+                    used_4mo_y1: sql<number>`COALESCE(ff.used_4mo_y1, 0)`.as('used_4mo_y1'),
+                    used_gt_6mo_y1: sql<number>`COALESCE(ff.used_gt_6mo_y1, 0)`.as('used_gt_6mo_y1'),
+                    used_all_mo_y1: sql<number>`COALESCE(ff.used_all_mo_y1, 0)`.as('used_all_mo_y1'),
+
+                    amount_port_1mo_y1: sql<number>`COALESCE(ff.amount_port_1mo_y1, 0)`.as('amount_port_1mo_y1'),
+                    amount_port_2mo_y1: sql<number>`COALESCE(ff.amount_port_2mo_y1, 0)`.as('amount_port_2mo_y1'),
+                    amount_port_3mo_y1: sql<number>`COALESCE(ff.amount_port_3mo_y1, 0)`.as('amount_port_3mo_y1'),
+                    amount_port_4mo_y1: sql<number>`COALESCE(ff.amount_port_4mo_y1, 0)`.as('amount_port_4mo_y1'),
+                    amount_port_gt_6mo_y1: sql<number>`COALESCE(ff.amount_port_gt_6mo_y1, 0)`.as('amount_port_gt_6mo_y1'),
+                    amount_port_all_mo_y1: sql<number>`COALESCE(ff.amount_port_all_mo_y1, 0)`.as('amount_port_all_mo_y1'),
+
+                    occ_1mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1mo_y) / SUM(amount_port_1mo_y) * 100, 2), 0), '%')`.as('occ_1mo_y'),
+                    occ_2mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_2mo_y) / SUM(amount_port_2mo_y) * 100, 2), 0), '%')`.as('occ_2mo_y'),
+                    occ_3mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_3mo_y) / SUM(amount_port_3mo_y) * 100, 2), 0), '%')`.as('occ_3mo_y'),
+                    occ_4mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_4mo_y) / SUM(amount_port_4mo_y) * 100, 2), 0), '%')`.as('occ_4mo_y'),
+                    occ_gt_6mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_gt_6mo_y) / SUM(amount_port_gt_6mo_y) * 100, 2), 0), '%')`.as('occ_gt_6mo_y'),
+                    occ_all_mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_all_mo_y) / SUM(amount_port_all_mo_y) * 100, 2), 0), '%')`.as('occ_all_mo_y'),
+
+                    occ_1mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1mo_y1) / SUM(amount_port_1mo_y1) * 100, 2), 0), '%')`.as('occ_1mo_y1'),
+                    occ_2mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_2mo_y1) / SUM(amount_port_2mo_y1) * 100, 2), 0), '%')`.as('occ_2mo_y1'),
+                    occ_3mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_3mo_y1) / SUM(amount_port_3mo_y1) * 100, 2), 0), '%')`.as('occ_3mo_y1'),
+                    occ_4mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_4mo_y1) / SUM(amount_port_4mo_y1) * 100, 2), 0), '%')`.as('occ_4mo_y1'),
+                    occ_gt_6mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_gt_6mo_y1) / SUM(amount_port_gt_6mo_y1) * 100, 2), 0), '%')`.as('occ_gt_6mo_y1'),
+                    occ_all_mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_all_mo_y1) / SUM(amount_port_all_mo_y1) * 100, 2), 0), '%')`.as('occ_all_mo_y1'),
+                })
+                .from(db
+                    .select({
+                        regional: sql<string>`CASE WHEN telkomsel_regional IN ('PUMA', 'MALUKU DAN PAPUA') THEN 'MALUKU DAN PAPUA' END`.as('telkomsel_regional'),
+
+                        avai_port_1mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_1mo_y'),
+                        avai_port_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_2mo_y'),
+                        avai_port_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_3mo_y'),
+                        avai_port_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_4mo_y'),
+
+                        used_1mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_1mo_y'),
+                        used_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_2mo_y'),
+                        used_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_3mo_y'),
+                        used_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_4mo_y'),
+                        used_gt_6mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_gt_6mo_y'),
+                        used_all_mo_y: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_all_mo_y'),
+
+                        used_1mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_1mo_y1'),
+                        used_2mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_2mo_y1'),
+                        used_3mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_3mo_y1'),
+                        used_4mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_4mo_y1'),
+                        used_gt_6mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_gt_6mo_y1'),
+                        used_all_mo_y1: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_all_mo_y1'),
+
+                        amount_port_1mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_1mo_y'),
+                        amount_port_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_2mo_y'),
+                        amount_port_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_3mo_y'),
+                        amount_port_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_4mo_y'),
+                        amount_port_gt_6mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_gt_6mo_y'),
+                        amount_port_all_mo_y: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_all_mo_y'),
+
+                        amount_port_1mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_1mo_y1'),
+                        amount_port_2mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_2mo_y1'),
+                        amount_port_3mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_3mo_y1'),
+                        amount_port_4mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_4mo_y1'),
+                        amount_port_gt_6mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_gt_6mo_y1'),
+                        amount_port_all_mo_y1: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_all_mo_y1'),
+                    })
+                    .from(ih_occ_golive_ihld)
+                    .where(eq(ih_occ_golive_ihld.telkomsel_regional, 'PUMA'))
+                    .groupBy(sql`1`)
+                    .as('ff')
+                )
+                .groupBy(sql`1`)
+                .as('f')
+
+            const regionalTargetDemands = db
+                .select({
+                    regional: sql<string>`b.regional`.as('regional'),
+                    ytd_demands: sum(targetTerritoryDemands.ytd_demand).as('ytd_demands')
+                })
+                .from(targetTerritoryDemands)
+                .rightJoin(
+                    db
+                        .selectDistinct({ regional: territoryHousehold.regional, branch: territoryHousehold.branch, wok: territoryHousehold.wok })
+                        .from(territoryHousehold)
+                        .as('b'),
+                    and(
+                        eq(targetTerritoryDemands.branch, sql`b.branch`),
+                        eq(targetTerritoryDemands.wok, sql`b.wok`)
+                    )
+                )
+                .where(eq(targetTerritoryDemands.periode, currYear))
+                .groupBy(sql`1`)
+                .as('t')
+
+            const regionalFinalQuery = db
+                .select({
+                    name: regionalTerritory.regional,
+                    level: sql<string>`'regional'`.as('level'),
+
+                    used_black: sql<number>`COALESCE(b.used_black, 0)`.as('used_black'),
+                    used_red: sql<number>`b.used_red`.as('used_red'),
+                    used_yellow: sql<number>`b.used_yellow`.as('used_yellow'),
+                    used_green: sql<number>`b.used_green`.as('used_green'),
+                    used: sql<number>`b.used`.as('used'),
+
+                    used_black_m1: sql<number>`COALESCE(c.used_black, 0)`.as('used_black_m1'),
+                    used_red_m1: sql<number>`c.used_red`.as('used_red_m1'),
+                    used_yellow_m1: sql<number>`c.used_yellow`.as('used_yellow_m1'),
+                    used_green_m1: sql<number>`c.used_green`.as('used_green_m1'),
+                    used_m1: sql<number>`c.used`.as('used_m1'),
+
+                    avai_port_black: sql<number>`COALESCE(b.avai_port_black, 0)`.as('avai_port_black'),
+                    avai_port_red: sql<number>`b.avai_port_red`.as('avai_port_red'),
+                    avai_port_yellow: sql<number>`b.avai_port_yellow`.as('avai_port_yellow'),
+                    avai_port_green: sql<number>`b.avai_port_green`.as('avai_port_green'),
+                    avai_port: sql<number>`b.avai_port`.as('avai_port'),
+
+                    amount_port_black: sql<number>`COALESCE(b.amount_port_black, 0)`.as('amount_port_black'),
+                    amount_port_red: sql<number>`b.amount_port_red`.as('amount_port_red'),
+                    amount_port_yellow: sql<number>`b.amount_port_yellow`.as('amount_port_yellow'),
+                    amount_port_green: sql<number>`b.amount_port_green`.as('amount_port_green'),
+                    amount_port: sql<number>`b.amount_port`.as('amount_port'),
+
+                    amount_port_black_m1: sql<number>`COALESCE(c.amount_port_black, 0)`.as('amount_port_black_m1'),
+                    amount_port_red_m1: sql<number>`c.amount_port_red`.as('amount_port_red_m1'),
+                    amount_port_yellow_m1: sql<number>`c.amount_port_yellow`.as('amount_port_yellow_m1'),
+                    amount_port_green_m1: sql<number>`c.amount_port_green`.as('amount_port_green_m1'),
+                    amount_port_m1: sql<number>`c.amount_port`.as('amount_port_m1'),
+
+                    total_odp_black: sql<number>`COALESCE(b.total_odp_black, 0)`.as('total_odp_black'),
+                    total_odp_red: sql<number>`b.total_odp_red`.as('total_odp_red'),
+                    total_odp_yellow: sql<number>`b.total_odp_yellow`.as('total_odp_yellow'),
+                    total_odp_green: sql<number>`b.total_odp_green`.as('total_odp_green'),
+                    total_odp: sql<number>`b.total_odp`.as('total_odp'),
+
+                    golive_m: sql<number>`d.golive_m`.as('golive_m'),
+                    golive_m1: sql<number>`d.golive_m1`.as('golive_m1'),
+                    golive_mom: sql<string>`d.golive_mom`.as('golive_mom'),
+                    golive_y: sql<number>`d.golive_y`.as('golive_y'),
+                    golive_y1: sql<number>`d.golive_y1`.as('golive_y1'),
+                    golive_yoy: sql<string>`d.golive_yoy`.as('golive_yoy'),
+                    golive_ytd: sql<number>`d.golive_ytd`.as('golive_ytd'),
+                    golive_ytd1: sql<number>`d.golive_ytd1`.as('golive_ytd1'),
+                    golive_ytd_per: sql<string>`d.golive_ytd_per`.as('golive_ytd_per'),
+
+                    target_ytd_demand: sql<number>`t.ytd_demands`.as('target_ytd_demand'),
+                    demand_created_mtd: sql<number>`COALESCE(e.demand_created_mtd, 0)`.as('demand_created_mtd'),
+                    demand_created_m1: sql<number>`COALESCE(e.demand_created_m1, 0)`.as('demand_created_m1'),
+                    demand_created_mom: sql<string>`CONCAT(COALESCE(ROUND((e.demand_created_mtd - e.demand_created_m1) / e.demand_created_m1 * 100, 2), 0), '%')`.as('demand_created_mom'),
+                    ach_demands: sql<string>`CONCAT(COALESCE(ROUND(e.demand_created_mtd / t.ytd_demands * 100, 2) ,0), '%')`.as('ach_demands'),
+
+                    avai_port_1mo_y: sql<number>`f.avai_port_1mo_y`.as('avai_port_1mo_y'),
+                    avai_port_2mo_y: sql<number>`f.avai_port_2mo_y`.as('avai_port_2mo_y'),
+                    avai_port_3mo_y: sql<number>`f.avai_port_3mo_y`.as('avai_port_3mo_y'),
+                    avai_port_4mo_y: sql<number>`f.avai_port_4mo_y`.as('avai_port_4mo_y'),
+
+                    used_1mo_y: sql<number>`f.used_1mo_y`.as('used_1mo_y'),
+                    used_2mo_y: sql<number>`f.used_2mo_y`.as('used_2mo_y'),
+                    used_3mo_y: sql<number>`f.used_3mo_y`.as('used_3mo_y'),
+                    used_4mo_y: sql<number>`f.used_4mo_y`.as('used_4mo_y'),
+                    used_gt_6mo_y: sql<number>`f.used_gt_6mo_y`.as('used_gt_6mo_y'),
+                    used_all_mo_y: sql<number>`f.used_all_mo_y`.as('used_all_mo_y'),
+
+                    amount_port_1mo_y: sql<number>`f.amount_port_1mo_y`.as('amount_port_1mo_y'),
+                    amount_port_2mo_y: sql<number>`f.amount_port_2mo_y`.as('amount_port_2mo_y'),
+                    amount_port_3mo_y: sql<number>`f.amount_port_3mo_y`.as('amount_port_3mo_y'),
+                    amount_port_4mo_y: sql<number>`f.amount_port_4mo_y`.as('amount_port_4mo_y'),
+                    amount_port_gt_6mo_y: sql<number>`f.amount_port_gt_6mo_y`.as('amount_port_gt_6mo_y'),
+                    amount_port_all_mo_y: sql<number>`f.amount_port_all_mo_y`.as('amount_port_all_mo_y'),
+
+                    used_1mo_y1: sql<number>`f.used_1mo_y1`.as('used_1mo_y1'),
+                    used_2mo_y1: sql<number>`f.used_2mo_y1`.as('used_2mo_y1'),
+                    used_3mo_y1: sql<number>`f.used_3mo_y1`.as('used_3mo_y1'),
+                    used_4mo_y1: sql<number>`f.used_4mo_y1`.as('used_4mo_y1'),
+                    used_gt_6mo_y1: sql<number>`f.used_gt_6mo_y1`.as('used_gt_6mo_y1'),
+                    used_all_mo_y1: sql<number>`f.used_all_mo_y1`.as('used_all_mo_y1'),
+
+                    amount_port_1mo_y1: sql<number>`f.amount_port_1mo_y1`.as('amount_port_1mo_y1'),
+                    amount_port_2mo_y1: sql<number>`f.amount_port_2mo_y1`.as('amount_port_2mo_y1'),
+                    amount_port_3mo_y1: sql<number>`f.amount_port_3mo_y1`.as('amount_port_3mo_y1'),
+                    amount_port_4mo_y1: sql<number>`f.amount_port_4mo_y1`.as('amount_port_4mo_y1'),
+                    amount_port_gt_6mo_y1: sql<number>`f.amount_port_gt_6mo_y1`.as('amount_port_gt_6mo_y1'),
+                    amount_port_all_mo_y1: sql<number>`f.amount_port_all_mo_y1`.as('amount_port_all_mo_y1'),
+
+                    occ_1mo_y: sql<string>`f.occ_1mo_y`.as('occ_1mo_y'),
+                    occ_2mo_y: sql<string>`f.occ_2mo_y`.as('occ_2mo_y'),
+                    occ_3mo_y: sql<string>`f.occ_3mo_y`.as('occ_3mo_y'),
+                    occ_4mo_y: sql<string>`f.occ_4mo_y`.as('occ_4mo_y'),
+                    occ_gt_6mo_y: sql<string>`f.occ_gt_6mo_y`.as('occ_gt_6mo_y'),
+                    occ_all_mo_y: sql<string>`f.occ_all_mo_y`.as('occ_all_mo_y'),
+
+                    occ_1mo_y1: sql<string>`f.occ_1mo_y1`.as('occ_1mo_y1'),
+                    occ_2mo_y1: sql<string>`f.occ_2mo_y1`.as('occ_2mo_y1'),
+                    occ_3mo_y1: sql<string>`f.occ_3mo_y1`.as('occ_3mo_y1'),
+                    occ_4mo_y1: sql<string>`f.occ_4mo_y1`.as('occ_4mo_y1'),
+                    occ_gt_6mo_y1: sql<string>`f.occ_gt_6mo_y1`.as('occ_gt_6mo_y1'),
+                    occ_all_mo_y1: sql<string>`f.occ_all_mo_y1`.as('occ_all_mo_y1'),
+
+                    occ_1mo_2y: sql<string>`CONCAT(ROUND((f.used_1mo_y + f.used_1mo_y1) / (f.amount_port_1mo_y + f.amount_port_1mo_y1) * 100 ,2), '%')`.as('occ_1mo_2y'),
+                    occ_2mo_2y: sql<string>`CONCAT(ROUND((f.used_2mo_y + f.used_2mo_y1) / (f.amount_port_2mo_y + f.amount_port_2mo_y1) * 100 ,2), '%')`.as('occ_2mo_2y'),
+                    occ_3mo_2y: sql<string>`CONCAT(ROUND((f.used_3mo_y + f.used_3mo_y1) / (f.amount_port_3mo_y + f.amount_port_3mo_y1) * 100 ,2), '%')`.as('occ_3mo_2y'),
+                    occ_4mo_2y: sql<string>`CONCAT(ROUND((f.used_4mo_y + f.used_4mo_y1) / (f.amount_port_4mo_y + f.amount_port_4mo_y1) * 100 ,2), '%')`.as('occ_4mo_2y'),
+                    occ_gt_6mo_2y: sql<string>`CONCAT(ROUND((f.used_gt_6mo_y + f.used_gt_6mo_y1) / (f.amount_port_gt_6mo_y + f.amount_port_gt_6mo_y1) * 100 ,2), '%')`.as('occ_gt_6mo_2y'),
+                    occ_all_mo_2y: sql<string>`CONCAT(ROUND((f.used_all_mo_y + f.used_all_mo_y1) / (f.amount_port_all_mo_y + f.amount_port_all_mo_y1) * 100 ,2), '%')`.as('occ_all_mo_2y'),
+                })
+                .from(regionalTerritory)
+                .leftJoin(regionalCurrOdp, sql`${regionalTerritory.regional} = b.regional`)
+                .leftJoin(regionalPrevOdp, sql`${regionalTerritory.regional} = c.regional`)
+                .leftJoin(regionalGoLive, sql`${regionalTerritory.regional} = d.regional`)
+                .leftJoin(regionalDemands, eq(regionalTerritory.regional, regionalDemands.regional))
+                .leftJoin(regionalGoLiveCurrYear, sql`${regionalTerritory.regional} = f.regional`)
+                .leftJoin(regionalTargetDemands, sql`${regionalTerritory.regional} = t.regional`)
+                .groupBy(sql`1,2`)
 
             const branchTerritory = db
                 .select({ branch: territoryHousehold.branch })
@@ -835,70 +1478,80 @@ const app = new Hono()
                     used_2mo_y: sql<number>`COALESCE(ff.used_2mo_y, 0)`.as('used_2mo_y'),
                     used_3mo_y: sql<number>`COALESCE(ff.used_3mo_y, 0)`.as('used_3mo_y'),
                     used_4mo_y: sql<number>`COALESCE(ff.used_4mo_y, 0)`.as('used_4mo_y'),
-                    used_1_6mo_y: sql<number>`COALESCE(ff.used_1_6mo_y, 0)`.as('used_1_6mo_y'),
+                    used_gt_6mo_y: sql<number>`COALESCE(ff.used_gt_6mo_y, 0)`.as('used_gt_6mo_y'),
+                    used_all_mo_y: sql<number>`COALESCE(ff.used_all_mo_y, 0)`.as('used_all_mo_y'),
 
                     amount_port_1mo_y: sql<number>`COALESCE(ff.amount_port_1mo_y, 0)`.as('amount_port_1mo_y'),
                     amount_port_2mo_y: sql<number>`COALESCE(ff.amount_port_2mo_y, 0)`.as('amount_port_2mo_y'),
                     amount_port_3mo_y: sql<number>`COALESCE(ff.amount_port_3mo_y, 0)`.as('amount_port_3mo_y'),
                     amount_port_4mo_y: sql<number>`COALESCE(ff.amount_port_4mo_y, 0)`.as('amount_port_4mo_y'),
-                    amount_port_1_6mo_y: sql<number>`COALESCE(ff.amount_port_1_6mo_y, 0)`.as('amount_port_1_6mo_y'),
+                    amount_port_gt_6mo_y: sql<number>`COALESCE(ff.amount_port_gt_6mo_y, 0)`.as('amount_port_gt_6mo_y'),
+                    amount_port_all_mo_y: sql<number>`COALESCE(ff.amount_port_all_mo_y, 0)`.as('amount_port_all_mo_y'),
 
                     used_1mo_y1: sql<number>`COALESCE(ff.used_1mo_y1, 0)`.as('used_1mo_y1'),
                     used_2mo_y1: sql<number>`COALESCE(ff.used_2mo_y1, 0)`.as('used_2mo_y1'),
                     used_3mo_y1: sql<number>`COALESCE(ff.used_3mo_y1, 0)`.as('used_3mo_y1'),
                     used_4mo_y1: sql<number>`COALESCE(ff.used_4mo_y1, 0)`.as('used_4mo_y1'),
-                    used_1_6mo_y1: sql<number>`COALESCE(ff.used_1_6mo_y1, 0)`.as('used_1_6mo_y1'),
+                    used_gt_6mo_y1: sql<number>`COALESCE(ff.used_gt_6mo_y1, 0)`.as('used_gt_6mo_y1'),
+                    used_all_mo_y1: sql<number>`COALESCE(ff.used_all_mo_y1, 0)`.as('used_all_mo_y1'),
 
                     amount_port_1mo_y1: sql<number>`COALESCE(ff.amount_port_1mo_y1, 0)`.as('amount_port_1mo_y1'),
                     amount_port_2mo_y1: sql<number>`COALESCE(ff.amount_port_2mo_y1, 0)`.as('amount_port_2mo_y1'),
                     amount_port_3mo_y1: sql<number>`COALESCE(ff.amount_port_3mo_y1, 0)`.as('amount_port_3mo_y1'),
                     amount_port_4mo_y1: sql<number>`COALESCE(ff.amount_port_4mo_y1, 0)`.as('amount_port_4mo_y1'),
-                    amount_port_1_6mo_y1: sql<number>`COALESCE(ff.amount_port_1_6mo_y1, 0)`.as('amount_port_1_6mo_y1'),
+                    amount_port_gt_6mo_y1: sql<number>`COALESCE(ff.amount_port_gt_6mo_y1, 0)`.as('amount_port_gt_6mo_y1'),
+                    amount_port_all_mo_y1: sql<number>`COALESCE(ff.amount_port_all_mo_y1, 0)`.as('amount_port_all_mo_y1'),
 
-                    occ_1mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1mo_y) / SUM(amount_port_1mo_y) * 100, 0), 2), '%')`.as('occ_1mo_y'),
-                    occ_2mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_2mo_y) / SUM(amount_port_2mo_y) * 100, 0), 2), '%')`.as('occ_2mo_y'),
-                    occ_3mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_3mo_y) / SUM(amount_port_3mo_y) * 100, 0), 2), '%')`.as('occ_3mo_y'),
-                    occ_4mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_4mo_y) / SUM(amount_port_4mo_y) * 100, 0), 2), '%')`.as('occ_4mo_y'),
-                    occ_1_6mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1_6mo_y) / SUM(amount_port_1_6mo_y) * 100, 0), 2), '%')`.as('occ_1_6mo_y'),
+                    occ_1mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1mo_y) / SUM(amount_port_1mo_y) * 100, 2), 0), '%')`.as('occ_1mo_y'),
+                    occ_2mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_2mo_y) / SUM(amount_port_2mo_y) * 100, 2), 0), '%')`.as('occ_2mo_y'),
+                    occ_3mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_3mo_y) / SUM(amount_port_3mo_y) * 100, 2), 0), '%')`.as('occ_3mo_y'),
+                    occ_4mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_4mo_y) / SUM(amount_port_4mo_y) * 100, 2), 0), '%')`.as('occ_4mo_y'),
+                    occ_gt_6mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_gt_6mo_y) / SUM(amount_port_gt_6mo_y) * 100, 2), 0), '%')`.as('occ_gt_6mo_y'),
+                    occ_all_mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_all_mo_y) / SUM(amount_port_all_mo_y) * 100, 2), 0), '%')`.as('occ_all_mo_y'),
 
-                    occ_1mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1mo_y1) / SUM(amount_port_1mo_y1) * 100, 0), 2), '%')`.as('occ_1mo_y1'),
-                    occ_2mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_2mo_y1) / SUM(amount_port_2mo_y1) * 100, 0), 2), '%')`.as('occ_2mo_y1'),
-                    occ_3mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_3mo_y1) / SUM(amount_port_3mo_y1) * 100, 0), 2), '%')`.as('occ_3mo_y1'),
-                    occ_4mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_4mo_y1) / SUM(amount_port_4mo_y1) * 100, 0), 2), '%')`.as('occ_4mo_y1'),
-                    occ_1_6mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1_6mo_y1) / SUM(amount_port_1_6mo_y1) * 100, 0), 2), '%')`.as('occ_1_6mo_y1')
+                    occ_1mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1mo_y1) / SUM(amount_port_1mo_y1) * 100, 2), 0), '%')`.as('occ_1mo_y1'),
+                    occ_2mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_2mo_y1) / SUM(amount_port_2mo_y1) * 100, 2), 0), '%')`.as('occ_2mo_y1'),
+                    occ_3mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_3mo_y1) / SUM(amount_port_3mo_y1) * 100, 2), 0), '%')`.as('occ_3mo_y1'),
+                    occ_4mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_4mo_y1) / SUM(amount_port_4mo_y1) * 100, 2), 0), '%')`.as('occ_4mo_y1'),
+                    occ_gt_6mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_gt_6mo_y1) / SUM(amount_port_gt_6mo_y1) * 100, 2), 0), '%')`.as('occ_gt_6mo_y1'),
+                    occ_all_mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_all_mo_y1) / SUM(amount_port_all_mo_y1) * 100, 2), 0), '%')`.as('occ_all_mo_y1'),
                 })
                 .from(db
                     .select({
                         branch: ih_occ_golive_ihld.telkomsel_branch,
 
                         avai_port_1mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_1mo_y'),
-                        avai_port_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 31 AND 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_2mo_y'),
-                        avai_port_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 61 AND 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_3mo_y'),
-                        avai_port_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 91 AND 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_4mo_y'),
+                        avai_port_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_2mo_y'),
+                        avai_port_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_3mo_y'),
+                        avai_port_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_4mo_y'),
 
                         used_1mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_1mo_y'),
-                        used_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 31 AND 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_2mo_y'),
-                        used_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 61 AND 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_3mo_y'),
-                        used_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 91 AND 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_4mo_y'),
-                        used_1_6mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_1_6mo_y'),
+                        used_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_2mo_y'),
+                        used_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_3mo_y'),
+                        used_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_4mo_y'),
+                        used_gt_6mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_gt_6mo_y'),
+                        used_all_mo_y: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_all_mo_y'),
 
                         used_1mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_1mo_y1'),
-                        used_2mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 31 AND 60 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_2mo_y1'),
-                        used_3mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 61 AND 90 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_3mo_y1'),
-                        used_4mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 91 AND 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_4mo_y1'),
-                        used_1_6mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_1_6mo_y1'),
+                        used_2mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_2mo_y1'),
+                        used_3mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_3mo_y1'),
+                        used_4mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_4mo_y1'),
+                        used_gt_6mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_gt_6mo_y1'),
+                        used_all_mo_y1: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_all_mo_y1'),
 
                         amount_port_1mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_1mo_y'),
-                        amount_port_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 31 AND 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_2mo_y'),
-                        amount_port_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 61 AND 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_3mo_y'),
-                        amount_port_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 91 AND 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_4mo_y'),
-                        amount_port_1_6mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_1_6mo_y'),
+                        amount_port_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_2mo_y'),
+                        amount_port_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_3mo_y'),
+                        amount_port_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_4mo_y'),
+                        amount_port_gt_6mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_gt_6mo_y'),
+                        amount_port_all_mo_y: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_all_mo_y'),
 
                         amount_port_1mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_1mo_y1'),
-                        amount_port_2mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 31 AND 60 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_2mo_y1'),
-                        amount_port_3mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 61 AND 90 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_3mo_y1'),
-                        amount_port_4mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 91 AND 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_4mo_y1'),
-                        amount_port_1_6mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_1_6mo_y1')
+                        amount_port_2mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_2mo_y1'),
+                        amount_port_3mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_3mo_y1'),
+                        amount_port_4mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_4mo_y1'),
+                        amount_port_gt_6mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_gt_6mo_y1'),
+                        amount_port_all_mo_y1: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_all_mo_y1'),
                     })
                     .from(ih_occ_golive_ihld)
                     .where(eq(ih_occ_golive_ihld.telkomsel_regional, 'PUMA'))
@@ -993,43 +1646,50 @@ const app = new Hono()
                     used_2mo_y: sql<number>`f.used_2mo_y`.as('used_2mo_y'),
                     used_3mo_y: sql<number>`f.used_3mo_y`.as('used_3mo_y'),
                     used_4mo_y: sql<number>`f.used_4mo_y`.as('used_4mo_y'),
-                    used_1_6mo_y: sql<number>`f.used_1_6mo_y`.as('used_1_6mo_y'),
+                    used_gt_6mo_y: sql<number>`f.used_gt_6mo_y`.as('used_gt_6mo_y'),
+                    used_all_mo_y: sql<number>`f.used_all_mo_y`.as('used_all_mo_y'),
 
                     amount_port_1mo_y: sql<number>`f.amount_port_1mo_y`.as('amount_port_1mo_y'),
                     amount_port_2mo_y: sql<number>`f.amount_port_2mo_y`.as('amount_port_2mo_y'),
                     amount_port_3mo_y: sql<number>`f.amount_port_3mo_y`.as('amount_port_3mo_y'),
                     amount_port_4mo_y: sql<number>`f.amount_port_4mo_y`.as('amount_port_4mo_y'),
-                    amount_port_1_6mo_y: sql<number>`f.amount_port_1_6mo_y`.as('amount_port_1_6mo_y'),
+                    amount_port_gt_6mo_y: sql<number>`f.amount_port_gt_6mo_y`.as('amount_port_gt_6mo_y'),
+                    amount_port_all_mo_y: sql<number>`f.amount_port_all_mo_y`.as('amount_port_all_mo_y'),
 
                     used_1mo_y1: sql<number>`f.used_1mo_y1`.as('used_1mo_y1'),
                     used_2mo_y1: sql<number>`f.used_2mo_y1`.as('used_2mo_y1'),
                     used_3mo_y1: sql<number>`f.used_3mo_y1`.as('used_3mo_y1'),
                     used_4mo_y1: sql<number>`f.used_4mo_y1`.as('used_4mo_y1'),
-                    used_1_6mo_y1: sql<number>`f.used_1_6mo_y1`.as('used_1_6mo_y1'),
+                    used_gt_6mo_y1: sql<number>`f.used_gt_6mo_y1`.as('used_gt_6mo_y1'),
+                    used_all_mo_y1: sql<number>`f.used_all_mo_y1`.as('used_all_mo_y1'),
 
                     amount_port_1mo_y1: sql<number>`f.amount_port_1mo_y1`.as('amount_port_1mo_y1'),
                     amount_port_2mo_y1: sql<number>`f.amount_port_2mo_y1`.as('amount_port_2mo_y1'),
                     amount_port_3mo_y1: sql<number>`f.amount_port_3mo_y1`.as('amount_port_3mo_y1'),
                     amount_port_4mo_y1: sql<number>`f.amount_port_4mo_y1`.as('amount_port_4mo_y1'),
-                    amount_port_1_6mo_y1: sql<number>`f.amount_port_1_6mo_y1`.as('amount_port_1_6mo_y1'),
+                    amount_port_gt_6mo_y1: sql<number>`f.amount_port_gt_6mo_y1`.as('amount_port_gt_6mo_y1'),
+                    amount_port_all_mo_y1: sql<number>`f.amount_port_all_mo_y1`.as('amount_port_all_mo_y1'),
 
                     occ_1mo_y: sql<string>`f.occ_1mo_y`.as('occ_1mo_y'),
                     occ_2mo_y: sql<string>`f.occ_2mo_y`.as('occ_2mo_y'),
                     occ_3mo_y: sql<string>`f.occ_3mo_y`.as('occ_3mo_y'),
                     occ_4mo_y: sql<string>`f.occ_4mo_y`.as('occ_4mo_y'),
-                    occ_1_6mo_y: sql<string>`f.occ_1_6mo_y`.as('occ_1_6mo_y'),
+                    occ_gt_6mo_y: sql<string>`f.occ_gt_6mo_y`.as('occ_gt_6mo_y'),
+                    occ_all_mo_y: sql<string>`f.occ_all_mo_y`.as('occ_all_mo_y'),
 
                     occ_1mo_y1: sql<string>`f.occ_1mo_y1`.as('occ_1mo_y1'),
                     occ_2mo_y1: sql<string>`f.occ_2mo_y1`.as('occ_2mo_y1'),
                     occ_3mo_y1: sql<string>`f.occ_3mo_y1`.as('occ_3mo_y1'),
                     occ_4mo_y1: sql<string>`f.occ_4mo_y1`.as('occ_4mo_y1'),
-                    occ_1_6mo_y1: sql<string>`f.occ_1_6mo_y1`.as('occ_1_6mo_y1'),
+                    occ_gt_6mo_y1: sql<string>`f.occ_gt_6mo_y1`.as('occ_gt_6mo_y1'),
+                    occ_all_mo_y1: sql<string>`f.occ_all_mo_y1`.as('occ_all_mo_y1'),
 
                     occ_1mo_2y: sql<string>`CONCAT(ROUND((f.used_1mo_y + f.used_1mo_y1) / (f.amount_port_1mo_y + f.amount_port_1mo_y1) * 100 ,2), '%')`.as('occ_1mo_2y'),
                     occ_2mo_2y: sql<string>`CONCAT(ROUND((f.used_2mo_y + f.used_2mo_y1) / (f.amount_port_2mo_y + f.amount_port_2mo_y1) * 100 ,2), '%')`.as('occ_2mo_2y'),
                     occ_3mo_2y: sql<string>`CONCAT(ROUND((f.used_3mo_y + f.used_3mo_y1) / (f.amount_port_3mo_y + f.amount_port_3mo_y1) * 100 ,2), '%')`.as('occ_3mo_2y'),
                     occ_4mo_2y: sql<string>`CONCAT(ROUND((f.used_4mo_y + f.used_4mo_y1) / (f.amount_port_4mo_y + f.amount_port_4mo_y1) * 100 ,2), '%')`.as('occ_4mo_2y'),
-                    occ_1_6mo_2y: sql<string>`CONCAT(ROUND((f.used_1_6mo_y + f.used_1_6mo_y1) / (f.amount_port_1_6mo_y + f.amount_port_1_6mo_y1) * 100 ,2), '%')`.as('occ_1_6mo_2y'),
+                    occ_gt_6mo_2y: sql<string>`CONCAT(ROUND((f.used_gt_6mo_y + f.used_gt_6mo_y1) / (f.amount_port_gt_6mo_y + f.amount_port_gt_6mo_y1) * 100 ,2), '%')`.as('occ_gt_6mo_2y'),
+                    occ_all_mo_2y: sql<string>`CONCAT(ROUND((f.used_all_mo_y + f.used_all_mo_y1) / (f.amount_port_all_mo_y + f.amount_port_all_mo_y1) * 100 ,2), '%')`.as('occ_all_mo_2y'),
                 })
                 .from(branchTerritory)
                 .leftJoin(branchCurrOdp, sql`${branchTerritory.branch} = b.branch`)
@@ -1207,70 +1867,80 @@ const app = new Hono()
                     used_2mo_y: sql<number>`COALESCE(ff.used_2mo_y, 0)`.as('used_2mo_y'),
                     used_3mo_y: sql<number>`COALESCE(ff.used_3mo_y, 0)`.as('used_3mo_y'),
                     used_4mo_y: sql<number>`COALESCE(ff.used_4mo_y, 0)`.as('used_4mo_y'),
-                    used_1_6mo_y: sql<number>`COALESCE(ff.used_1_6mo_y, 0)`.as('used_1_6mo_y'),
+                    used_gt_6mo_y: sql<number>`COALESCE(ff.used_gt_6mo_y, 0)`.as('used_gt_6mo_y'),
+                    used_all_mo_y: sql<number>`COALESCE(ff.used_all_mo_y, 0)`.as('used_all_mo_y'),
 
                     amount_port_1mo_y: sql<number>`COALESCE(ff.amount_port_1mo_y, 0)`.as('amount_port_1mo_y'),
                     amount_port_2mo_y: sql<number>`COALESCE(ff.amount_port_2mo_y, 0)`.as('amount_port_2mo_y'),
                     amount_port_3mo_y: sql<number>`COALESCE(ff.amount_port_3mo_y, 0)`.as('amount_port_3mo_y'),
                     amount_port_4mo_y: sql<number>`COALESCE(ff.amount_port_4mo_y, 0)`.as('amount_port_4mo_y'),
-                    amount_port_1_6mo_y: sql<number>`COALESCE(ff.amount_port_1_6mo_y, 0)`.as('amount_port_1_6mo_y'),
+                    amount_port_gt_6mo_y: sql<number>`COALESCE(ff.amount_port_gt_6mo_y, 0)`.as('amount_port_gt_6mo_y'),
+                    amount_port_all_mo_y: sql<number>`COALESCE(ff.amount_port_all_mo_y, 0)`.as('amount_port_all_mo_y'),
 
                     used_1mo_y1: sql<number>`COALESCE(ff.used_1mo_y1, 0)`.as('used_1mo_y1'),
                     used_2mo_y1: sql<number>`COALESCE(ff.used_2mo_y1, 0)`.as('used_2mo_y1'),
                     used_3mo_y1: sql<number>`COALESCE(ff.used_3mo_y1, 0)`.as('used_3mo_y1'),
                     used_4mo_y1: sql<number>`COALESCE(ff.used_4mo_y1, 0)`.as('used_4mo_y1'),
-                    used_1_6mo_y1: sql<number>`COALESCE(ff.used_1_6mo_y1, 0)`.as('used_1_6mo_y1'),
+                    used_gt_6mo_y1: sql<number>`COALESCE(ff.used_gt_6mo_y1, 0)`.as('used_gt_6mo_y1'),
+                    used_all_mo_y1: sql<number>`COALESCE(ff.used_all_mo_y1, 0)`.as('used_all_mo_y1'),
 
                     amount_port_1mo_y1: sql<number>`COALESCE(ff.amount_port_1mo_y1, 0)`.as('amount_port_1mo_y1'),
                     amount_port_2mo_y1: sql<number>`COALESCE(ff.amount_port_2mo_y1, 0)`.as('amount_port_2mo_y1'),
                     amount_port_3mo_y1: sql<number>`COALESCE(ff.amount_port_3mo_y1, 0)`.as('amount_port_3mo_y1'),
                     amount_port_4mo_y1: sql<number>`COALESCE(ff.amount_port_4mo_y1, 0)`.as('amount_port_4mo_y1'),
-                    amount_port_1_6mo_y1: sql<number>`COALESCE(ff.amount_port_1_6mo_y1, 0)`.as('amount_port_1_6mo_y1'),
+                    amount_port_gt_6mo_y1: sql<number>`COALESCE(ff.amount_port_gt_6mo_y1, 0)`.as('amount_port_gt_6mo_y1'),
+                    amount_port_all_mo_y1: sql<number>`COALESCE(ff.amount_port_all_mo_y1, 0)`.as('amount_port_all_mo_y1'),
 
-                    occ_1mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1mo_y) / SUM(amount_port_1mo_y) * 100, 0), 2), '%')`.as('occ_1mo_y'),
-                    occ_2mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_2mo_y) / SUM(amount_port_2mo_y) * 100, 0), 2), '%')`.as('occ_2mo_y'),
-                    occ_3mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_3mo_y) / SUM(amount_port_3mo_y) * 100, 0), 2), '%')`.as('occ_3mo_y'),
-                    occ_4mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_4mo_y) / SUM(amount_port_4mo_y) * 100, 0), 2), '%')`.as('occ_4mo_y'),
-                    occ_1_6mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1_6mo_y) / SUM(amount_port_1_6mo_y) * 100, 0), 2), '%')`.as('occ_1_6mo_y'),
+                    occ_1mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1mo_y) / SUM(amount_port_1mo_y) * 100, 2), 0), '%')`.as('occ_1mo_y'),
+                    occ_2mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_2mo_y) / SUM(amount_port_2mo_y) * 100, 2), 0), '%')`.as('occ_2mo_y'),
+                    occ_3mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_3mo_y) / SUM(amount_port_3mo_y) * 100, 2), 0), '%')`.as('occ_3mo_y'),
+                    occ_4mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_4mo_y) / SUM(amount_port_4mo_y) * 100, 2), 0), '%')`.as('occ_4mo_y'),
+                    occ_gt_6mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_gt_6mo_y) / SUM(amount_port_gt_6mo_y) * 100, 2), 0), '%')`.as('occ_gt_6mo_y'),
+                    occ_all_mo_y: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_all_mo_y) / SUM(amount_port_all_mo_y) * 100, 2), 0), '%')`.as('occ_all_mo_y'),
 
-                    occ_1mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1mo_y1) / SUM(amount_port_1mo_y1) * 100, 0), 2), '%')`.as('occ_1mo_y1'),
-                    occ_2mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_2mo_y1) / SUM(amount_port_2mo_y1) * 100, 0), 2), '%')`.as('occ_2mo_y1'),
-                    occ_3mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_3mo_y1) / SUM(amount_port_3mo_y1) * 100, 0), 2), '%')`.as('occ_3mo_y1'),
-                    occ_4mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_4mo_y1) / SUM(amount_port_4mo_y1) * 100, 0), 2), '%')`.as('occ_4mo_y1'),
-                    occ_1_6mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1_6mo_y1) / SUM(amount_port_1_6mo_y1) * 100, 0), 2), '%')`.as('occ_1_6mo_y1')
+                    occ_1mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_1mo_y1) / SUM(amount_port_1mo_y1) * 100, 2), 0), '%')`.as('occ_1mo_y1'),
+                    occ_2mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_2mo_y1) / SUM(amount_port_2mo_y1) * 100, 2), 0), '%')`.as('occ_2mo_y1'),
+                    occ_3mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_3mo_y1) / SUM(amount_port_3mo_y1) * 100, 2), 0), '%')`.as('occ_3mo_y1'),
+                    occ_4mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_4mo_y1) / SUM(amount_port_4mo_y1) * 100, 2), 0), '%')`.as('occ_4mo_y1'),
+                    occ_gt_6mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_gt_6mo_y1) / SUM(amount_port_gt_6mo_y1) * 100, 2), 0), '%')`.as('occ_gt_6mo_y1'),
+                    occ_all_mo_y1: sql<string>`CONCAT(COALESCE(ROUND(SUM(used_all_mo_y1) / SUM(amount_port_all_mo_y1) * 100, 2), 0), '%')`.as('occ_all_mo_y1'),
                 })
                 .from(db
                     .select({
                         wok: ih_occ_golive_ihld.wok,
 
                         avai_port_1mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_1mo_y'),
-                        avai_port_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 31 AND 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_2mo_y'),
-                        avai_port_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 61 AND 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_3mo_y'),
-                        avai_port_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 91 AND 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_4mo_y'),
+                        avai_port_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_2mo_y'),
+                        avai_port_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_3mo_y'),
+                        avai_port_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN avai END)`.as('avai_port_4mo_y'),
 
                         used_1mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_1mo_y'),
-                        used_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 31 AND 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_2mo_y'),
-                        used_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 61 AND 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_3mo_y'),
-                        used_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 91 AND 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_4mo_y'),
-                        used_1_6mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_1_6mo_y'),
+                        used_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_2mo_y'),
+                        used_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_3mo_y'),
+                        used_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_4mo_y'),
+                        used_gt_6mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_gt_6mo_y'),
+                        used_all_mo_y: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${currYear} THEN used END)`.as('used_all_mo_y'),
 
                         used_1mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_1mo_y1'),
-                        used_2mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 31 AND 60 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_2mo_y1'),
-                        used_3mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 61 AND 90 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_3mo_y1'),
-                        used_4mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 91 AND 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_4mo_y1'),
-                        used_1_6mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_1_6mo_y1'),
+                        used_2mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_2mo_y1'),
+                        used_3mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_3mo_y1'),
+                        used_4mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_4mo_y1'),
+                        used_gt_6mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_gt_6mo_y1'),
+                        used_all_mo_y1: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${prevYear} THEN used END)`.as('used_all_mo_y1'),
 
                         amount_port_1mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_1mo_y'),
-                        amount_port_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 31 AND 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_2mo_y'),
-                        amount_port_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 61 AND 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_3mo_y'),
-                        amount_port_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 91 AND 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_4mo_y'),
-                        amount_port_1_6mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_1_6mo_y'),
+                        amount_port_2mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_2mo_y'),
+                        amount_port_3mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_3mo_y'),
+                        amount_port_4mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_4mo_y'),
+                        amount_port_gt_6mo_y: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_gt_6mo_y'),
+                        amount_port_all_mo_y: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${currYear} THEN is_total END)`.as('amount_port_all_mo_y'),
 
                         amount_port_1mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 30 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_1mo_y1'),
-                        amount_port_2mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 31 AND 60 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_2mo_y1'),
-                        amount_port_3mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 61 AND 90 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_3mo_y1'),
-                        amount_port_4mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) BETWEEN 91 AND 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_4mo_y1'),
-                        amount_port_1_6mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_1_6mo_y1')
+                        amount_port_2mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 60 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_2mo_y1'),
+                        amount_port_3mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 90 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_3mo_y1'),
+                        amount_port_4mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) <= 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_4mo_y1'),
+                        amount_port_gt_6mo_y1: sql<number>`SUM(CASE WHEN DATEDIFF((SELECT MAX(tanggal_go_live_uim) FROM household.ih_occ_golive_ihld), tanggal_go_live_uim) > 180 AND YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_gt_6mo_y1'),
+                        amount_port_all_mo_y1: sql<number>`SUM(CASE WHEN YEAR(tanggal_go_live_uim) = ${prevYear} THEN is_total END)`.as('amount_port_all_mo_y1'),
                     })
                     .from(ih_occ_golive_ihld)
                     .where(and(
@@ -1365,43 +2035,50 @@ const app = new Hono()
                     used_2mo_y: sql<number>`f.used_2mo_y`.as('used_2mo_y'),
                     used_3mo_y: sql<number>`f.used_3mo_y`.as('used_3mo_y'),
                     used_4mo_y: sql<number>`f.used_4mo_y`.as('used_4mo_y'),
-                    used_1_6mo_y: sql<number>`f.used_1_6mo_y`.as('used_1_6mo_y'),
+                    used_gt_6mo_y: sql<number>`f.used_gt_6mo_y`.as('used_gt_6mo_y'),
+                    used_all_mo_y: sql<number>`f.used_all_mo_y`.as('used_all_mo_y'),
 
                     amount_port_1mo_y: sql<number>`f.amount_port_1mo_y`.as('amount_port_1mo_y'),
                     amount_port_2mo_y: sql<number>`f.amount_port_2mo_y`.as('amount_port_2mo_y'),
                     amount_port_3mo_y: sql<number>`f.amount_port_3mo_y`.as('amount_port_3mo_y'),
                     amount_port_4mo_y: sql<number>`f.amount_port_4mo_y`.as('amount_port_4mo_y'),
-                    amount_port_1_6mo_y: sql<number>`f.amount_port_1_6mo_y`.as('amount_port_1_6mo_y'),
+                    amount_port_gt_6mo_y: sql<number>`f.amount_port_gt_6mo_y`.as('amount_port_gt_6mo_y'),
+                    amount_port_all_mo_y: sql<number>`f.amount_port_all_mo_y`.as('amount_port_all_mo_y'),
 
                     used_1mo_y1: sql<number>`f.used_1mo_y1`.as('used_1mo_y1'),
                     used_2mo_y1: sql<number>`f.used_2mo_y1`.as('used_2mo_y1'),
                     used_3mo_y1: sql<number>`f.used_3mo_y1`.as('used_3mo_y1'),
                     used_4mo_y1: sql<number>`f.used_4mo_y1`.as('used_4mo_y1'),
-                    used_1_6mo_y1: sql<number>`f.used_1_6mo_y1`.as('used_1_6mo_y1'),
+                    used_gt_6mo_y1: sql<number>`f.used_gt_6mo_y1`.as('used_gt_6mo_y1'),
+                    used_all_mo_y1: sql<number>`f.used_all_mo_y1`.as('used_all_mo_y1'),
 
                     amount_port_1mo_y1: sql<number>`f.amount_port_1mo_y1`.as('amount_port_1mo_y1'),
                     amount_port_2mo_y1: sql<number>`f.amount_port_2mo_y1`.as('amount_port_2mo_y1'),
                     amount_port_3mo_y1: sql<number>`f.amount_port_3mo_y1`.as('amount_port_3mo_y1'),
                     amount_port_4mo_y1: sql<number>`f.amount_port_4mo_y1`.as('amount_port_4mo_y1'),
-                    amount_port_1_6mo_y1: sql<number>`f.amount_port_1_6mo_y1`.as('amount_port_1_6mo_y1'),
+                    amount_port_gt_6mo_y1: sql<number>`f.amount_port_gt_6mo_y1`.as('amount_port_gt_6mo_y1'),
+                    amount_port_all_mo_y1: sql<number>`f.amount_port_all_mo_y1`.as('amount_port_all_mo_y1'),
 
                     occ_1mo_y: sql<string>`f.occ_1mo_y`.as('occ_1mo_y'),
                     occ_2mo_y: sql<string>`f.occ_2mo_y`.as('occ_2mo_y'),
                     occ_3mo_y: sql<string>`f.occ_3mo_y`.as('occ_3mo_y'),
                     occ_4mo_y: sql<string>`f.occ_4mo_y`.as('occ_4mo_y'),
-                    occ_1_6mo_y: sql<string>`f.occ_1_6mo_y`.as('occ_1_6mo_y'),
+                    occ_gt_6mo_y: sql<string>`f.occ_gt_6mo_y`.as('occ_gt_6mo_y'),
+                    occ_all_mo_y: sql<string>`f.occ_all_mo_y`.as('occ_all_mo_y'),
 
                     occ_1mo_y1: sql<string>`f.occ_1mo_y1`.as('occ_1mo_y1'),
                     occ_2mo_y1: sql<string>`f.occ_2mo_y1`.as('occ_2mo_y1'),
                     occ_3mo_y1: sql<string>`f.occ_3mo_y1`.as('occ_3mo_y1'),
                     occ_4mo_y1: sql<string>`f.occ_4mo_y1`.as('occ_4mo_y1'),
-                    occ_1_6mo_y1: sql<string>`f.occ_1_6mo_y1`.as('occ_1_6mo_y1'),
+                    occ_gt_6mo_y1: sql<string>`f.occ_gt_6mo_y1`.as('occ_gt_6mo_y1'),
+                    occ_all_mo_y1: sql<string>`f.occ_all_mo_y1`.as('occ_all_mo_y1'),
 
                     occ_1mo_2y: sql<string>`CONCAT(ROUND((f.used_1mo_y + f.used_1mo_y1) / (f.amount_port_1mo_y + f.amount_port_1mo_y1) * 100 ,2), '%')`.as('occ_1mo_2y'),
                     occ_2mo_2y: sql<string>`CONCAT(ROUND((f.used_2mo_y + f.used_2mo_y1) / (f.amount_port_2mo_y + f.amount_port_2mo_y1) * 100 ,2), '%')`.as('occ_2mo_2y'),
                     occ_3mo_2y: sql<string>`CONCAT(ROUND((f.used_3mo_y + f.used_3mo_y1) / (f.amount_port_3mo_y + f.amount_port_3mo_y1) * 100 ,2), '%')`.as('occ_3mo_2y'),
                     occ_4mo_2y: sql<string>`CONCAT(ROUND((f.used_4mo_y + f.used_4mo_y1) / (f.amount_port_4mo_y + f.amount_port_4mo_y1) * 100 ,2), '%')`.as('occ_4mo_2y'),
-                    occ_1_6mo_2y: sql<string>`CONCAT(ROUND((f.used_1_6mo_y + f.used_1_6mo_y1) / (f.amount_port_1_6mo_y + f.amount_port_1_6mo_y1) * 100 ,2), '%')`.as('occ_1_6mo_2y'),
+                    occ_gt_6mo_2y: sql<string>`CONCAT(ROUND((f.used_gt_6mo_y + f.used_gt_6mo_y1) / (f.amount_port_gt_6mo_y + f.amount_port_gt_6mo_y1) * 100 ,2), '%')`.as('occ_gt_6mo_2y'),
+                    occ_all_mo_2y: sql<string>`CONCAT(ROUND((f.used_all_mo_y + f.used_all_mo_y1) / (f.amount_port_all_mo_y + f.amount_port_all_mo_y1) * 100 ,2), '%')`.as('occ_all_mo_2y'),
                 })
                 .from(wokTerritory)
                 .leftJoin(wokCurrOdp, sql`${wokTerritory.wok} = b.wok`)
@@ -1420,8 +2097,16 @@ const app = new Hono()
                 return c.json({ data: finalDataRevenue })
             }
 
+            if (branch) {
+                const [finalDataRevenue] = await Promise.all([
+                    branchFinalQuery
+                ])
+
+                return c.json({ data: finalDataRevenue })
+            }
+
             const [finalDataRevenue] = await Promise.all([
-                branchFinalQuery
+                regionalFinalQuery
             ])
 
             return c.json({ data: finalDataRevenue })
@@ -1440,6 +2125,55 @@ const app = new Hono()
 
             const currStartOfMonth = format(startOfMonth(selectedDate), 'yyyy-MM-dd')
             const currDate = format(selectedDate, 'yyyy-MM-dd')
+
+            const regionalSFData = db
+                .select({
+                    sf_code: ihOrderingDetailOrder.sf_code,
+                    regional: sql<string>`region`.as('regional'),
+                    ps: count(ihOrderingDetailOrder.ps_ts).as('ps')
+                })
+                .from(ihOrderingDetailOrder)
+                .where(and(
+                    eq(ihOrderingDetailOrder.region, 'MALUKU DAN PAPUA'),
+                    eq(ihOrderingDetailOrder.order_type, 'NEW SALES'),
+                    eq(ihOrderingDetailOrder.order_channel, 'i4'),
+                    inArray(ihOrderingDetailOrder.funneling_group, ['COMPLETED', 'PS']),
+                    isNotNull(ihOrderingDetailOrder.ps_ts),
+                    isNotNull(ihOrderingDetailOrder.sf_code),
+                    sql`DATE_FORMAT(${ihOrderingDetailOrder.ps_ts}, '%Y-%m-%d') BETWEEN ${currStartOfMonth} AND ${currDate}`,
+                ))
+                .groupBy(ihOrderingDetailOrder.sf_code)
+                .as('a')
+
+            const regionalSFClassification = db
+                .select({
+                    sf_code: regionalSFData.sf_code,
+                    regional: regionalSFData.regional,
+                    ps: regionalSFData.ps,
+                    category: sql<string>`CASE
+                        WHEN a.ps BETWEEN 0 AND 1 THEN 'BLACK'
+                        WHEN a.ps BETWEEN 2 AND 5 THEN 'BRONZE'
+                        WHEN a.ps BETWEEN 6 AND 10 THEN 'SILVER'
+                        WHEN a.ps BETWEEN 11 AND 20 THEN 'GOLD'
+                        WHEN a.ps > 20 THEN 'PLATINUM'
+                    END`.as('category')
+                })
+                .from(regionalSFData)
+                .groupBy(sql`1`)
+                .as('b')
+
+            const regionalSFSummary = db
+                .select({
+                    name: regionalSFClassification.regional,
+                    sf_black: sql<number>`COUNT(CASE WHEN category = 'BLACK' THEN sf_code END)`.as('sf_black'),
+                    sf_bronze: sql<number>`COUNT(CASE WHEN category = 'BRONZE' THEN sf_code END)`.as('sf_bronze'),
+                    sf_silver: sql<number>`COUNT(CASE WHEN category = 'SILVER' THEN sf_code END)`.as('sf_silver'),
+                    sf_gold: sql<number>`COUNT(CASE WHEN category = 'GOLD' THEN sf_code END)`.as('sf_gold'),
+                    sf_platinum: sql<number>`COUNT(CASE WHEN category = 'PLATINUM' THEN sf_code END)`.as('sf_platinum'),
+                    total_sf: sql<number>`COUNT(sf_code)`.as('total_sf')
+                })
+                .from(regionalSFClassification)
+                .groupBy(sql`1`)
 
             const branchSFData = db
                 .select({
@@ -1549,8 +2283,16 @@ const app = new Hono()
                 return c.json({ data: finalDataRevenue })
             }
 
+            if (branch) {
+                const [finalDataRevenue] = await Promise.all([
+                    branchSFSummary
+                ])
+
+                return c.json({ data: finalDataRevenue })
+            }
+
             const [finalDataRevenue] = await Promise.all([
-                branchSFSummary
+                regionalSFSummary
             ])
 
             return c.json({ data: finalDataRevenue })
@@ -1567,17 +2309,91 @@ const app = new Hono()
 
             const ihC3mr = dynamicIhC3mr(currYear, currMonth)
 
-            const endOfCurrMonth = isEndOfMonth ? lastDayOfSelectedMonth : selectedDate;
-            const endOfPrevMonth = isEndOfMonth ? endOfMonth(subMonths(selectedDate, 1)) : subMonths(selectedDate, 1);
-            const endOfPrevYearSameMonth = isEndOfMonth ? endOfMonth(subYears(selectedDate, 1)) : subYears(selectedDate, 1);
-
             const currStartOfMonth = format(startOfMonth(selectedDate), 'yyyy-MM-dd')
             const currDate = format(selectedDate, 'yyyy-MM-dd')
-            const prevDate = format(endOfPrevMonth, 'yyyy-MM-dd');
-            const prevYearCurrDate = format(endOfPrevYearSameMonth, 'yyyy-MM-dd');
             const yyyyMM = format(selectedDate, 'yyyyMM')
-            const daysInMonth = getDaysInMonth(selectedDate)
-            const today = Number(format(selectedDate, 'd'))
+
+            const regionalTerritory = db
+                .select({
+                    regional: territoryHousehold.regional
+                })
+                .from(territoryHousehold)
+                .where(eq(territoryHousehold.regional, 'MALUKU DAN PAPUA'))
+                .groupBy(sql`1`)
+                .as('a')
+
+            const summaryRegional = db
+                .select({
+                    regional: ihC3mr.region,
+                    bill_amount_all: sql<number>`ROUND(SUM(bill_amount) / 1000000000, 2)`.as('bill_amount_all'),
+                    bill_amount_ns: sql<number>`ROUND(SUM(CASE WHEN billing_category = 'PSB' THEN bill_amount END) / 1000000000, 2)`.as('bill_amount_ns'),
+                    bill_amount_existing: sql<number>`ROUND(SUM(CASE WHEN billing_category = 'EXISTING' THEN bill_amount END) / 1000000000, 2)`.as('bill_amount_existing'),
+
+                    subs_0_6: sql<number>`COUNT(CASE WHEN los_category IN ('0-3 bulan', '4-6 bulan') THEN 1 END)`.as('subs_0_6'),
+                    subs_paid_0_6: sql<number>`COUNT(CASE WHEN paid_flag = 1 and los_category IN ('0-3 bulan', '4-6 bulan') THEN 1 END)`.as('subs_paid_0_6'),
+                    subs_unpaid_0_6: sql<number>`COUNT(CASE WHEN paid_flag = 0 and los_category IN ('0-3 bulan', '4-6 bulan') THEN 1 END)`.as('subs_unpaid_0_6'),
+                    subs_gt_6: sql<number>`COUNT(CASE WHEN los_category IN ('7-12 bulan', '12-24 bulan','>24 bulan') THEN 1 END)`.as('subs_gt_6'),
+                    subs_paid_gt_6: sql<number>`COUNT(CASE WHEN paid_flag = 1 and los_category IN ('7-12 bulan', '12-24 bulan','>24 bulan') THEN 1 END)`.as('subs_paid_gt_6'),
+                    subs_unpaid_gt_6: sql<number>`COUNT(CASE WHEN paid_flag = 0 and los_category IN ('7-12 bulan', '12-24 bulan','>24 bulan') THEN 1 END)`.as('subs_unpaid_gt_6'),
+
+                    bill_amount_all_unpaid: sql<number>`ROUND(SUM(CASE WHEN paid_flag = 0 THEN bill_amount END) / 1000000000, 2)`.as('bill_amount_all_unpaid'),
+                    bill_amount_ns_unpaid: sql<number>`ROUND(SUM(CASE WHEN billing_category = 'PSB' AND paid_flag = 0 THEN bill_amount END) / 1000000000, 2)`.as('bill_amount_ns_unpaid'),
+                    bill_amount_existing_unpaid: sql<number>`ROUND(SUM(CASE WHEN billing_category = 'EXISTING' AND paid_flag = 0 THEN bill_amount END) / 1000000000, 2)`.as('bill_amount_existing_unpaid')
+                })
+                .from(ihC3mr)
+                .groupBy(sql`1`)
+                .as('b')
+
+            const regionalTargetRevenue = db
+                .select({
+                    regional: sql<string>`CASE WHEN b.branch IN ('TIMIKA', 'SORONG', 'AMBON', 'JAYAPURA') THEN 'MALUKU DAN PAPUA' END`.as('regional'),
+                    target_rev_all: sql<number>`ROUND(SUM(rev_all), 2)`.as('target_rev_all'),
+                    target_rev_ns: sql<number>`ROUND(SUM(rev_ns), 2)`.as('target_rev_ns'),
+                    target_rev_existing: sql<number>`ROUND(SUM(rev_existing), 2)`.as('target_rev_existing'),
+                })
+                .from(targetRevenueC3mr)
+                .rightJoin(
+                    db.selectDistinct({ regional: territoryHousehold.regional, branch: territoryHousehold.branch, wok: territoryHousehold.wok }).from(territoryHousehold).as('b'),
+                    and(eq(targetRevenueC3mr.branch, sql`b.branch`), eq(targetRevenueC3mr.wok, sql`b.wok`))
+                )
+                .where(eq(targetRevenueC3mr.periode, yyyyMM))
+                .groupBy(sql`1`)
+                .as('c')
+
+            const regionalFinalQuery = db
+                .select({
+                    name: sql<string>`a.regional`.as('regional'),
+                    target_rev_all: sql<number>`ROUND(SUM(c.target_rev_all), 2)`.as('target_rev_all'),
+                    bill_amount_all: sql<number>`ROUND(SUM(b.bill_amount_all), 2)`.as('bill_amount_all'),
+                    bill_amount_all_unpaid: sql<number>`ROUND(SUM(b.bill_amount_all_unpaid), 2)`.as('bill_amount_all_unpaid'),
+                    ach_fm_rev_all: sql<string>`CONCAT(ROUND(SUM(b.bill_amount_all) / SUM(c.target_rev_all) * 100, 2), '%')`.as('ach_fm_rev_all'),
+                    gap_to_target_rev_all: sql<number>`ROUND((SUM(b.bill_amount_all)) - SUM(c.target_rev_all), 2)`.as('gap_to_target_rev_all'),
+
+                    target_rev_ns: sql<number>`ROUND(SUM(c.target_rev_ns), 2)`.as('target_rev_ns'),
+                    bill_amount_ns: sql<number>`ROUND(SUM(b.bill_amount_ns), 2)`.as('bill_amount_ns'),
+                    bill_amount_ns_unpaid: sql<number>`ROUND(SUM(b.bill_amount_ns_unpaid), 2)`.as('bill_amount_ns_unpaid'),
+                    ach_fm_rev_ns: sql<string>`CONCAT(ROUND(SUM(b.bill_amount_ns) / SUM(c.target_rev_ns) * 100, 2), '%')`.as('ach_fm_rev_ns'),
+                    gap_to_target_rev_ns: sql<number>`ROUND((SUM(b.bill_amount_ns)) - SUM(c.target_rev_ns), 2)`.as('gap_to_target_rev_ns'),
+
+                    target_rev_existing: sql<number>`ROUND(SUM(c.target_rev_existing), 2)`.as('target_rev_existing'),
+                    bill_amount_existing: sql<number>`ROUND(SUM(b.bill_amount_existing), 2)`.as('bill_amount_existing'),
+                    bill_amount_existing_unpaid: sql<number>`ROUND(SUM(b.bill_amount_existing_unpaid), 2)`.as('bill_amount_existing_unpaid'),
+                    ach_fm_rev_existing: sql<string>`CONCAT(ROUND(SUM(b.bill_amount_existing) / SUM(c.target_rev_existing) * 100, 2), '%')`.as('ach_fm_rev_existing'),
+                    gap_to_target_rev_existing: sql<number>`ROUND(SUM(b.bill_amount_existing)  - SUM(c.target_rev_existing), 2)`.as('gap_to_target_rev_existing'),
+
+                    subs_0_6: summaryRegional.subs_0_6,
+                    subs_paid_0_6: summaryRegional.subs_paid_0_6,
+                    ach_subs_0_6: sql<string>`CONCAT(ROUND(b.subs_paid_0_6 / b.subs_0_6 * 100, 2), '%')`.as('ach_subs_0_6'),
+                    subs_gt_6: summaryRegional.subs_gt_6,
+                    subs_paid_gt_6: summaryRegional.subs_paid_gt_6,
+                    ach_subs_paid_gt_6: sql<string>`CONCAT(ROUND(b.subs_paid_gt_6 / b.subs_gt_6 * 100, 2), '%')`.as('ach_subs_paid_gt_6'),
+
+                    revenue_loss: sql<number>`ROUND((SUM(b.bill_amount_ns_unpaid) - SUM(b.bill_amount_all_unpaid)), 2)`.as('revenue_loss')
+                })
+                .from(regionalTerritory)
+                .leftJoin(summaryRegional, eq(regionalTerritory.regional, summaryRegional.regional))
+                .leftJoin(regionalTargetRevenue, eq(regionalTerritory.regional, sql`c.regional`))
+                .groupBy(sql`1`)
 
             const branchTerritory = db
                 .select({
@@ -1772,8 +2588,16 @@ const app = new Hono()
                 return c.json({ data: finalDataRevenue }, 200)
             }
 
+            if (branch) {
+                const [finalDataRevenue] = await Promise.all([
+                    branchFinalQuery
+                ])
+
+                return c.json({ data: finalDataRevenue }, 200)
+            }
+
             const [finalDataRevenue] = await Promise.all([
-                branchFinalQuery
+                regionalFinalQuery
             ])
 
             return c.json({ data: finalDataRevenue }, 200)

@@ -119,9 +119,9 @@ const app = new Hono()
 
             return c.json({ data: finalDataRevenue })
         })
-    .get('/revenue-gross-prabayar', zValidator('query', z.object({ date: z.coerce.date().optional() })),
+    .get('/revenue-gross-prabayar', zValidator('query', z.object({ date: z.coerce.date().optional(), branch: z.string().optional(), subbranch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })),
         async c => {
-            const { date } = c.req.valid('query')
+            const { date, branch, subbranch, cluster, kabupaten } = c.req.valid('query')
             const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
 
             const lastDayOfSelectedMonth = endOfMonth(selectedDate);
@@ -286,7 +286,10 @@ const app = new Hono()
             const branchSubquery = db
                 .select({ branch: territoryArea4.branch })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    branch ? eq(territoryArea4.branch, branch) : undefined
+                ))
                 .groupBy(territoryArea4.branch)
                 .as('a')
 
@@ -431,7 +434,14 @@ const app = new Hono()
             const subbranchSubquery = db
                 .select({ subbranch: territoryArea4.subbranch })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch)
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch)
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.subbranch)
                 .as('a')
 
@@ -576,7 +586,19 @@ const app = new Hono()
             const clusterSubquery = db
                 .select({ cluster: territoryArea4.cluster })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.cluster)
                 .as('a')
 
@@ -721,7 +743,25 @@ const app = new Hono()
             const kabupatenSubquery = db
                 .select({ kabupaten: territoryArea4.kabupaten })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster && kabupaten ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                    eq(territoryArea4.kabupaten, kabupaten),
+                ) : branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.kabupaten)
                 .as('a')
 
@@ -854,9 +894,9 @@ const app = new Hono()
 
             return c.json({ data: finalDataRevenue }, 200)
         })
-    .get('/revenue-byu', zValidator('query', z.object({ date: z.coerce.date().optional() })),
+    .get('/revenue-byu', zValidator('query', z.object({ date: z.coerce.date().optional(), branch: z.string().optional(), subbranch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })),
         async c => {
-            const { date } = c.req.valid('query')
+            const { date, branch, subbranch, cluster, kabupaten } = c.req.valid('query')
             const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
 
             const lastDayOfSelectedMonth = endOfMonth(selectedDate);
@@ -942,7 +982,10 @@ const app = new Hono()
             const branchSubquery = db
                 .select({ branch: territoryArea4.branch })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    branch ? eq(territoryArea4.branch, branch) : undefined
+                ))
                 .groupBy(territoryArea4.branch)
                 .as('a')
 
@@ -1010,7 +1053,14 @@ const app = new Hono()
             const subbranchSubquery = db
                 .select({ subbranch: territoryArea4.subbranch })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch)
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch)
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.subbranch)
                 .as('a')
 
@@ -1081,7 +1131,19 @@ const app = new Hono()
             const clusterSubquery = db
                 .select({ cluster: territoryArea4.cluster })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.cluster)
                 .as('a')
 
@@ -1152,7 +1214,25 @@ const app = new Hono()
             const kabupatenSubquery = db
                 .select({ kabupaten: territoryArea4.kabupaten })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster && kabupaten ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                    eq(territoryArea4.kabupaten, kabupaten),
+                ) : branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.kabupaten)
                 .as('a')
 
@@ -1211,9 +1291,9 @@ const app = new Hono()
 
             return c.json({ data: finalDataRevenue }, 200)
         })
-    .get('/revenue-byu-v2', zValidator('query', z.object({ date: z.coerce.date().optional() })),
+    .get('/revenue-byu-v2', zValidator('query', z.object({ date: z.coerce.date().optional(), branch: z.string().optional(), subbranch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })),
         async c => {
-            const { date } = c.req.valid('query')
+            const { date, branch, subbranch, cluster, kabupaten } = c.req.valid('query')
             const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
 
             const currDate = format(selectedDate, 'yyyy-MM-dd')
@@ -1378,7 +1458,10 @@ const app = new Hono()
             const branchSubquery = db
                 .select({ branch: territoryArea4.branch })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    branch ? eq(territoryArea4.branch, branch) : undefined
+                ))
                 .groupBy(territoryArea4.branch)
                 .as('a')
 
@@ -1532,7 +1615,14 @@ const app = new Hono()
             const subbranchSubquery = db
                 .select({ subbranch: territoryArea4.subbranch })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch)
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch)
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.subbranch)
                 .as('a')
 
@@ -1686,7 +1776,19 @@ const app = new Hono()
             const clusterSubquery = db
                 .select({ cluster: territoryArea4.cluster })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.cluster)
                 .as('a')
 
@@ -1840,7 +1942,25 @@ const app = new Hono()
             const kabupatenSubquery = db
                 .select({ kabupaten: territoryArea4.kabupaten })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster && kabupaten ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                    eq(territoryArea4.kabupaten, kabupaten),
+                ) : branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.kabupaten)
                 .as('a')
 
@@ -1958,9 +2078,9 @@ const app = new Hono()
 
             return c.json({ data: finalDataRevenue }, 200)
         })
-    .get('/revenue-gross-all', zValidator('query', z.object({ date: z.coerce.date().optional() })),
+    .get('/revenue-gross-all', zValidator('query', z.object({ date: z.coerce.date().optional(), branch: z.string().optional(), subbranch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })),
         async c => {
-            const { date } = c.req.valid('query')
+            const { date, branch, subbranch, cluster, kabupaten } = c.req.valid('query')
             const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
 
             const currDate = format(selectedDate, 'yyyy-MM-dd')
@@ -2123,7 +2243,10 @@ const app = new Hono()
             const branchSubquery = db
                 .select({ branch: territoryArea4.branch })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    branch ? eq(territoryArea4.branch, branch) : undefined
+                ))
                 .groupBy(territoryArea4.branch)
                 .as('a')
 
@@ -2276,7 +2399,14 @@ const app = new Hono()
             const subbranchSubquery = db
                 .select({ subbranch: territoryArea4.subbranch })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch)
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch)
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.subbranch)
                 .as('a')
 
@@ -2428,7 +2558,19 @@ const app = new Hono()
             const clusterSubquery = db
                 .select({ cluster: territoryArea4.cluster })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.cluster)
                 .as('a')
 
@@ -2581,7 +2723,25 @@ const app = new Hono()
             const kabupatenSubquery = db
                 .select({ kabupaten: territoryArea4.kabupaten })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster && kabupaten ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                    eq(territoryArea4.kabupaten, kabupaten),
+                ) : branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.kabupaten)
                 .as('a')
 

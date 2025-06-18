@@ -2,23 +2,20 @@
 
 import { format, subDays } from "date-fns"
 import { useQuery } from "@tanstack/react-query"
-import { useMemo, useState } from "react"
 
 import { Filters } from "./filter"
 import { DataTable, DataTableODP } from "./data-table"
 
 import { useSelectDate } from "@/hooks/use-select-date"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useSelectBranch } from "@/hooks/use-select-branch"
 import { useSelectWok } from "@/hooks/use-select-wok"
 import { client } from "@/lib/client"
-import { ProgressCard, GoliveCard } from "./progress-card"
+import { ProgressCard, GoliveCard, DemandData } from "./progress-card"
 
 const Page = () => {
     const { date: selectedDate } = useSelectDate()
-    const { branch } = useSelectBranch()
-    const { wok } = useSelectWok()
-    const [fetchDataClicked, setFetchDataClicked] = useState(false);
+    const { branch, setSelectedBranch } = useSelectBranch()
+    const { wok, setSelectedWok } = useSelectWok()
 
     const { data, isLoading, isError, error, refetch, isSuccess } = useQuery({
         queryKey: ['demands-deployment', selectedDate, branch, wok],
@@ -44,17 +41,20 @@ const Page = () => {
             const { data } = await response.json()
             return data
         },
-        enabled: false,
+        enabled: true,
         refetchOnWindowFocus: false,
         retry: 1,
         gcTime: 5 * 60 * 1000,
     })
 
     const handleClick = () => {
-        refetch()
-        if (!fetchDataClicked) {
-            setFetchDataClicked(true);
-        }
+        // refetch()
+        // if (!fetchDataClicked) {
+        //     setFetchDataClicked(true);
+        // }
+
+        setSelectedBranch('')
+        setSelectedWok('')
     };
 
     const isDataActuallyAvailable = data && data.length > 0;
@@ -62,7 +62,7 @@ const Page = () => {
     return (
         <div className="overflow-hidden rounded-xl space-y-4">
             <div className="py-2">
-                <Filters daysBehind={2} handleClick={handleClick} />
+                <Filters daysBehind={2} handleClick={handleClick} disabled={isLoading} />
             </div>
 
             {(() => {
@@ -93,11 +93,18 @@ const Page = () => {
                                 </div>
                             )}
 
-                            <DataTable data={data} />
-                            <DataTableODP data={data} />
+                            <section className="space-y-6">
+                                <DataTable data={data} />
+                            </section>
 
                             <section className="space-y-6">
-                                <div>
+                                <DataTableODP data={data} />
+                            </section>
+
+
+                            <section className="space-y-6">
+                                <div className="flex items-center">
+                                    <div className="w-1 h-6 bg-gradient-to-b from-orange-600 to-amber-600 rounded-full mr-3"></div>
                                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">New Golive (UIM) - Port</h2>
                                 </div>
 
@@ -123,7 +130,8 @@ const Page = () => {
                                             { label: '2mo GL', total_port: data[0].amount_port_2mo_y1, used_port: data[0].used_2mo_y1, ach: data[0].occ_2mo_y1 },
                                             { label: '3mo GL', total_port: data[0].amount_port_3mo_y1, used_port: data[0].used_3mo_y1, ach: data[0].occ_3mo_y1 },
                                             { label: '4-6mo GL', total_port: data[0].amount_port_4mo_y1, used_port: data[0].used_4mo_y1, ach: data[0].occ_4mo_y1 },
-                                            { label: 'Total', total_port: data[0].amount_port_1_6mo_y1, used_port: data[0].used_1_6mo_y1, ach: data[0].occ_1_6mo_y1 },
+                                            { label: '>6mo GL', total_port: data[0].amount_port_gt_6mo_y1, used_port: data[0].used_gt_6mo_y1, ach: data[0].occ_gt_6mo_y1 },
+                                            { label: 'Total', total_port: data[0].amount_port_all_mo_y1, used_port: data[0].used_all_mo_y1, ach: data[0].occ_all_mo_y1 },
                                         ]}
                                     />
 
@@ -135,7 +143,8 @@ const Page = () => {
                                             { label: '2mo GL', total_port: data[0].amount_port_2mo_y, used_port: data[0].used_2mo_y, ach: data[0].occ_2mo_y },
                                             { label: '3mo GL', total_port: data[0].amount_port_3mo_y, used_port: data[0].used_3mo_y, ach: data[0].occ_3mo_y },
                                             { label: '4-6mo GL', total_port: data[0].amount_port_4mo_y, used_port: data[0].used_4mo_y, ach: data[0].occ_4mo_y },
-                                            { label: 'Total', total_port: data[0].amount_port_1_6mo_y, used_port: data[0].used_1_6mo_y, ach: data[0].occ_1_6mo_y },
+                                            { label: '>6mo GL', total_port: data[0].amount_port_gt_6mo_y, used_port: data[0].used_gt_6mo_y, ach: data[0].occ_gt_6mo_y },
+                                            { label: 'Total', total_port: data[0].amount_port_all_mo_y, used_port: data[0].used_all_mo_y, ach: data[0].occ_all_mo_y },
                                         ]}
                                     />
 
@@ -147,60 +156,38 @@ const Page = () => {
                                             { label: '2mo GL', total_port: Number(data[0].amount_port_2mo_y) + Number(data[0].amount_port_2mo_y1), used_port: Number(data[0].used_2mo_y) + Number(data[0].used_2mo_y1), ach: data[0].occ_2mo_2y },
                                             { label: '3mo GL', total_port: Number(data[0].amount_port_3mo_y) + Number(data[0].amount_port_3mo_y1), used_port: Number(data[0].used_3mo_y) + Number(data[0].used_3mo_y1), ach: data[0].occ_3mo_2y },
                                             { label: '4-6mo GL', total_port: Number(data[0].amount_port_4mo_y) + Number(data[0].amount_port_4mo_y1), used_port: Number(data[0].used_4mo_y) + Number(data[0].used_4mo_y1), ach: data[0].occ_4mo_2y },
-                                            { label: 'Total', total_port: Number(data[0].amount_port_1_6mo_y) + Number(data[0].amount_port_1_6mo_y1), used_port: Number(data[0].used_1_6mo_y) + Number(data[0].used_1_6mo_y1), ach: data[0].occ_1_6mo_2y },
+                                            { label: '>6mo GL', total_port: Number(data[0].amount_port_gt_6mo_y) + Number(data[0].amount_port_gt_6mo_y1), used_port: Number(data[0].used_gt_6mo_y) + Number(data[0].used_gt_6mo_y1), ach: data[0].occ_gt_6mo_2y },
+                                            { label: 'Total', total_port: Number(data[0].amount_port_all_mo_y) + Number(data[0].amount_port_all_mo_y1), used_port: Number(data[0].used_all_mo_y) + Number(data[0].used_all_mo_y1), ach: data[0].occ_all_mo_2y },
                                         ]}
                                     />
                                 </div>
                             </section>
 
                             <section className="space-y-6">
-                                <div>
+                                <div className="flex items-center">
+                                    <div className="w-1 h-6 bg-gradient-to-b from-orange-600 to-amber-600 rounded-full mr-3"></div>
                                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Demands</h2>
                                 </div>
 
                                 <div className="max-w-md">
-                                    <Card className="@container/card bg-white dark:bg-white/[0.03]">
-                                        <CardHeader className="relative">
-                                            <CardTitle>DEMANDS</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="flex flex-col">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm">YtD Demands</span>
-                                                <div className="text-base font-semibold">{data[0].target_ytd_demand.toLocaleString('id-ID')}</div>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm">Created</span>
-                                                <div className="text-base font-semibold">{data[0].demand_created_mtd}</div>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm">MoM</span>
-                                                <div className="text-base font-semibold">{data[0].demand_created_mom}</div>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm">Achieved</span>
-                                                <div className="text-base font-semibold">{data[0].ach_demands}</div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                                    <DemandData
+                                        data={[
+                                            { metric: 'YTD DEMANDS', value: data[0].target_ytd_demand },
+                                            { metric: 'CREATED', value: data[0].demand_created_mtd },
+                                            { metric: 'MoM', value: data[0].demand_created_mom },
+                                            { metric: 'Achieved', value: data[0].ach_demands },
+                                        ]}
+                                    />
                                 </div>
                             </section>
                         </div>
                     );
                 }
 
-                if (fetchDataClicked && (isSuccess || isError /* an attempt was made */) && !isDataActuallyAvailable) {
+                if ((isSuccess || isError /* an attempt was made */) && !isDataActuallyAvailable) {
                     return (
                         <div className="flex h-full items-center justify-center">
                             <p>No data found for the selected filters.</p>
-                        </div>
-                    );
-                }
-
-                // Initial state: no fetch attempted yet
-                if (!fetchDataClicked) {
-                    return (
-                        <div className="flex h-full items-center justify-center">
-                            <p>"Tampilkan data" to view reports.</p>
                         </div>
                     );
                 }

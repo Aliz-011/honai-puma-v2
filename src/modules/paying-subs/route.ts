@@ -5,14 +5,14 @@ import { z } from "zod";
 
 import { zValidator } from "@/lib/validator-wrapper";
 import { db } from "@/db";
-import { feiTargetPuma, summaryRevAllKabupaten, summaryRgbHqKabupaten, summaryRgbHqRegional, summaryRgbHqBranch, summaryRgbHqCluster, summaryRevAllRegional, summaryRevAllBranch, summaryRevAllCluster } from "@/db/schema/v_honai_puma";
+import { feiTargetPuma, summaryRevAllKabupaten, summaryRgbHqKabupaten, summaryRgbHqRegional, summaryRgbHqBranch, summaryRgbHqCluster, summaryRevAllRegional, summaryRevAllBranch, summaryRevAllCluster, summaryRevAllSubbranch } from "@/db/schema/v_honai_puma";
 import { territoryArea4 } from "@/db/schema/puma_2025";
 import { unionAll } from "drizzle-orm/mysql-core";
 
 const app = new Hono()
-    .get('/paying-los-all', zValidator('query', z.object({ date: z.coerce.date().optional() })),
+    .get('/paying-los-all', zValidator('query', z.object({ date: z.coerce.date().optional(), branch: z.string().optional(), subbranch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })),
         async c => {
-            const { date } = c.req.valid('query')
+            const { date, branch, subbranch, cluster, kabupaten } = c.req.valid('query')
             const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
 
             const lastDayOfSelectedMonth = endOfMonth(selectedDate);
@@ -191,7 +191,10 @@ const app = new Hono()
                     branch: territoryArea4.branch,
                 })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    branch ? eq(territoryArea4.branch, branch) : undefined
+                ))
                 .groupBy(territoryArea4.branch)
                 .as('a')
 
@@ -343,6 +346,147 @@ const app = new Hono()
                 })
                 .from(feiTargetPuma)
 
+            const subbranchTerritory = db
+                .select({
+                    subbranch: territoryArea4.subbranch,
+                })
+                .from(territoryArea4)
+                .where(branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch)
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch)
+                ) : eq(territoryArea4.regional, 'PUMA'))
+                .groupBy(territoryArea4.subbranch)
+                .as('a')
+
+            const rgbSubbranch = db
+                .select({
+                    subbranch: sql<string>`
+                    CASE
+                        WHEN kabupaten IN ('AMBON','KOTA AMBON','MALUKU TENGAH','SERAM BAGIAN TIMUR') THEN 'AMBON'
+                        WHEN kabupaten IN ('KEPULAUAN ARU','KOTA TUAL','MALUKU BARAT DAYA','MALUKU TENGGARA','MALUKU TENGGARA BARAT','KEPULAUAN TANIMBAR') THEN 'KEPULAUAN AMBON'
+                        WHEN kabupaten IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BURU'
+                        WHEN kabupaten IN ('KOTA JAYAPURA') THEN 'JAYAPURA'
+                        WHEN kabupaten IN ('JAYAPURA','KEEROM','MAMBERAMO RAYA','SARMI','BIAK','BIAK NUMFOR','KEPULAUAN YAPEN','SUPIORI','WAROPEN','JAYAWIJAYA','LANNY JAYA','MAMBERAMO TENGAH','NDUGA','PEGUNUNGAN BINTANG','TOLIKARA','YAHUKIMO','YALIMO') THEN 'SENTANI'
+                        WHEN kabupaten IN ('MANOKWARI') THEN 'MANOKWARI'
+                        WHEN kabupaten IN ('FAKFAK','FAK FAK','KAIMANA','MANOKWARI SELATAN','PEGUNUNGAN ARFAK','TELUK BINTUNI','TELUK WONDAMA') THEN 'MANOKWARI OUTER'
+                        WHEN kabupaten IN ('KOTA SORONG','MAYBRAT','RAJA AMPAT','SORONG','SORONG SELATAN','TAMBRAUW') THEN 'SORONG RAJA AMPAT'
+                        WHEN kabupaten IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'MERAUKE'
+                        WHEN kabupaten IN ('INTAN JAYA','MIMIKA','PUNCAK','PUNCAK JAYA','TIMIKA') THEN 'MIMIKA'
+                        WHEN kabupaten IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
+                        ELSE NULL
+                    END
+                    `.as('subbranch'),
+                    cbLastYear: summaryRgbHqKabupaten.cb_m12,
+                    cbLastMonth: summaryRgbHqKabupaten.cb_m1,
+                    mtdCb: summaryRgbHqKabupaten.cb_mtd,
+                    rgbLastYear: summaryRgbHqKabupaten.rgb_m12,
+                    rgbLastMonth: summaryRgbHqKabupaten.rgb_m1,
+                    mtdRgb: summaryRgbHqKabupaten.rgb_mtd,
+                    rgbDataLastYear: summaryRgbHqKabupaten.rgb_data_m12,
+                    rgbDataLastMonth: summaryRgbHqKabupaten.rgb_data_m1,
+                    mtdRgbData: summaryRgbHqKabupaten.rgb_data_mtd,
+                    rgbDigitalLastYear: summaryRgbHqKabupaten.rgb_digital_m12,
+                    rgbDigitalLastMonth: summaryRgbHqKabupaten.rgb_digital_m1,
+                    mtdRgbDigital: summaryRgbHqKabupaten.rgb_digital_mtd,
+                    payloadLastYear: summaryRgbHqKabupaten.payload_user_m12,
+                    payloadLastMonth: summaryRgbHqKabupaten.payload_user_m1,
+                    mtdPayload: summaryRgbHqKabupaten.payload_user_mtd
+                })
+                .from(summaryRgbHqKabupaten)
+                .where(and(
+                    eq(summaryRgbHqKabupaten.event_date, currDate),
+                    eq(summaryRgbHqKabupaten.regional, 'PUMA'),
+                    eq(summaryRgbHqKabupaten.catlos, '1.0-1 mo'),
+                    eq(summaryRgbHqKabupaten.brand, 'all')
+                ))
+                .groupBy(sql`1`)
+                .as('b')
+
+            const subbranchTargetRevenue = db
+                .select({
+                    subbranch: territoryArea4.subbranch,
+                    target_paying_los_0_1: sum(feiTargetPuma.paying_los_0_1).as('target_paying_los_0_1')
+                })
+                .from(feiTargetPuma)
+                .rightJoin(territoryArea4, eq(feiTargetPuma.territory, territoryArea4.kabupaten))
+                .where(eq(feiTargetPuma.periode, yyyyMM))
+                .groupBy(territoryArea4.subbranch)
+                .as('c')
+
+            const summaryRevSubbranch = db
+                .select({
+                    subbranch: summaryRevAllSubbranch.subbranch,
+                    revAllM: summaryRevAllSubbranch.rev_all_m,
+                    revAllM1: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevDate} THEN ${summaryRevAllSubbranch.rev_all_m} END)`.as('rev_all_m1'),
+                    revAllM12: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevYearCurrDate} THEN ${summaryRevAllSubbranch.rev_all_m} END)`.as('rev_all_m12'),
+
+                    revBbM: summaryRevAllSubbranch.rev_bb_m,
+                    revBbM1: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevDate} THEN ${summaryRevAllSubbranch.rev_bb_m} END)`.as('rev_bb_m1'),
+                    revBbM12: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevYearCurrDate} THEN ${summaryRevAllSubbranch.rev_bb_m} END)`.as('rev_bb_m12'),
+
+                    revVoiceM: summaryRevAllSubbranch.rev_voice_m,
+                    revVoiceM1: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevDate} THEN ${summaryRevAllSubbranch.rev_voice_m} END)`.as('rev_voice_m1'),
+                    revVoiceM12: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevYearCurrDate} THEN ${summaryRevAllSubbranch.rev_voice_m} END)`.as('rev_voice_m12'),
+
+                    revDigitalM: summaryRevAllSubbranch.rev_digital_m,
+                    revDigitalM1: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevDate} THEN ${summaryRevAllSubbranch.rev_digital_m} END)`.as('rev_digital_m1'),
+                    revDigitalM12: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevYearCurrDate} THEN ${summaryRevAllSubbranch.rev_digital_m} END)`.as('rev_digital_m12')
+                })
+                .from(summaryRevAllSubbranch)
+                .where(and(
+                    eq(summaryRevAllSubbranch.regional, 'PUMA'),
+                    eq(summaryRevAllSubbranch.newAbcStrate, 'all')
+                ))
+                .groupBy(summaryRevAllSubbranch.subbranch)
+                .as('d')
+
+            const revenueSubbranch = db
+                .select({
+                    name: subbranchTerritory.subbranch,
+                    target_rgb_all: sql<number>`ROUND(SUM(${subbranchTargetRevenue.target_paying_los_0_1}),0)`.as('target_rgb_all'),
+                    mtd_rgb: sql<number>`ROUND(SUM(${rgbSubbranch.mtdRgb}),0)`.as('mtd_rgb'),
+                    mom_rgb: sql<string>`CONCAT(ROUND(((SUM(${rgbSubbranch.mtdRgb})/SUM(${rgbSubbranch.rgbLastMonth}))-1)*100,2),'%')`.as('mom_rgb'),
+                    yoy_rgb: sql<string>`CONCAT(ROUND(((SUM(${rgbSubbranch.mtdRgb})/SUM(${rgbSubbranch.rgbLastYear}))-1)*100,2),'%')`.as('yoy_rgb'),
+
+                    ach_target_fm_rgb: sql<string>`CONCAT(ROUND((SUM(${rgbSubbranch.mtdRgb})/SUM(${subbranchTargetRevenue.target_paying_los_0_1}))*100,2),'%')`.as('ach_target_fm_rgb'),
+                    drr_rgb: sql<string>`CONCAT(ROUND((SUM(${rgbSubbranch.mtdRgb})/(${today}/${daysInMonth}*(SUM(${subbranchTargetRevenue.target_paying_los_0_1}))))*100,2),'%')`.as('drr_rgb'),
+                    gap_to_target_rgb: sql<string>`ROUND((COALESCE(SUM(${rgbSubbranch.mtdRgb}) - SUM(${subbranchTargetRevenue.target_paying_los_0_1}),0)),0)`.as('gap_to_target_rgb'),
+                    penetration_to_cb: sql<string>`CONCAT(ROUND((SUM(${rgbSubbranch.mtdRgb})/SUM(${rgbSubbranch.mtdCb})*100),2),'%')`.as('penetration_to_cb'),
+
+                    mtd_rgb_data: sql<number>`ROUND(SUM(${rgbSubbranch.mtdRgbData}),0)`.as('mtd_rgb_data'),
+                    mom_rgb_data: sql<string>`CONCAT(ROUND((((SUM(${rgbSubbranch.mtdRgbData})/SUM(${rgbSubbranch.rgbDataLastMonth}))-1)*100),2),'%')`.as('mom_rgb_data'),
+                    yoy_rgb_data: sql<string>`CONCAT(ROUND((((SUM(${rgbSubbranch.mtdRgbData})/SUM(${rgbSubbranch.rgbDataLastYear}))-1)*100),2),'%')`.as('yoy_rgb_data'),
+
+                    mtd_rgb_digital: sql<number>`ROUND(SUM(${rgbSubbranch.mtdRgbDigital}),0)`.as('mtd_rgb_digital'),
+                    mom_rgb_digital: sql<string>`CONCAT(ROUND((((SUM(${rgbSubbranch.mtdRgbDigital})/SUM(${rgbSubbranch.rgbDigitalLastMonth}))-1)*100),2),'%')`.as('mom_rgb_digital'),
+                    yoy_rgb_digital: sql<string>`CONCAT(ROUND((((SUM(${rgbSubbranch.mtdRgbDigital})/SUM(${rgbSubbranch.rgbDigitalLastYear}))-1)*100),2),'%')`.as('yoy_rgb_digital'),
+
+                    mtd_arpu: sql<number>`ROUND(SUM(${summaryRevSubbranch.revAllM})/SUM(${rgbSubbranch.mtdRgb}),0)`.as('mtd_arpu'),
+                    mom_arpu: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revAllM})/SUM(${rgbSubbranch.mtdRgb}))/(SUM(${summaryRevSubbranch.revAllM1})/SUM(${rgbSubbranch.rgbDataLastMonth})))-1)*100,2),'%')`.as('mom_arpu'),
+                    yoy_arpu: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revAllM})/SUM(${rgbSubbranch.mtdRgb}))/(SUM(${summaryRevSubbranch.revAllM12})/SUM(${rgbSubbranch.rgbDataLastYear})))-1)*100,2),'%')`.as('yoy_arpu'),
+
+                    mtd_arpu_data: sql<number>`ROUND(SUM(${summaryRevSubbranch.revBbM})/SUM(${rgbSubbranch.mtdRgbData}),0)`.as('mtd_arpu_data'),
+                    mom_arpu_data: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revBbM})/SUM(${rgbSubbranch.mtdRgbData}))/(SUM(${summaryRevSubbranch.revBbM1})/SUM(${rgbSubbranch.rgbDataLastMonth})))-1)*100,2),'%')`.as('mom_arpu_data'),
+                    yoy_arpu_data: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revBbM})/SUM(${rgbSubbranch.mtdRgbData}))/(SUM(${summaryRevSubbranch.revBbM12})/SUM(${rgbSubbranch.rgbDataLastYear})))-1)*100,2),'%')`.as('yoy_arpu_data'),
+
+                    mtd_arpu_digital: sql<number>`ROUND(SUM(${summaryRevSubbranch.revDigitalM})/SUM(${rgbSubbranch.mtdRgbDigital}),0)`.as('mtd_arpu_digital'),
+                    mom_arpu_digital: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revDigitalM})/SUM(${rgbSubbranch.mtdRgbDigital}))/(SUM(${summaryRevSubbranch.revDigitalM1})/SUM(${rgbSubbranch.rgbDigitalLastMonth})))-1)*100,2),'%')`.as('mom_arpu_digital'),
+                    yoy_arpu_digital: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revDigitalM})/SUM(${rgbSubbranch.mtdRgbDigital}))/(SUM(${summaryRevSubbranch.revDigitalM12})/SUM(${rgbSubbranch.rgbDigitalLastYear})))-1)*100,2),'%')`.as('yoy_arpu_digital'),
+
+                    mtd_rpmb: sql<number>`ROUND(SUM(${summaryRevSubbranch.revAllM})/(SUM(${rgbSubbranch.mtdPayload})/1024),2)`.as('mtd_rpmb'),
+                    mom_rpmb: sql<string>`CONCAT(ROUND(((SUM(${summaryRevSubbranch.revAllM})/(SUM(${rgbSubbranch.mtdPayload})/1024)) / (SUM(${summaryRevSubbranch.revAllM1})/(SUM(${rgbSubbranch.payloadLastMonth})/1024))-1)*100,2),'%')`.as('mom_rpmb'),
+                    yoy_rpmb: sql<string>`CONCAT(ROUND(((SUM(${summaryRevSubbranch.revAllM})/(SUM(${rgbSubbranch.mtdPayload})/1024)) / (SUM(${summaryRevSubbranch.revAllM12})/(SUM(${rgbSubbranch.payloadLastYear})/1024))-1)*100,2),'%')`.as('yoy_rpmb'),
+                })
+                .from(subbranchTerritory)
+                .leftJoin(rgbSubbranch, eq(subbranchTerritory.subbranch, sql`b.subbranch`))
+                .leftJoin(subbranchTargetRevenue, eq(subbranchTerritory.subbranch, subbranchTargetRevenue.subbranch))
+                .leftJoin(summaryRevSubbranch, eq(subbranchTerritory.subbranch, summaryRevSubbranch.subbranch))
+                .groupBy(subbranchTerritory.subbranch)
+
             const clusterHeaderQuery = db
                 .selectDistinct({
                     name: sql<string | null>`'CLUSTER'`,
@@ -386,7 +530,19 @@ const app = new Hono()
                     cluster: territoryArea4.cluster,
                 })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.cluster)
                 .as('a')
 
@@ -543,7 +699,25 @@ const app = new Hono()
                     kabupaten: territoryArea4.kabupaten,
                 })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster && kabupaten ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                    eq(territoryArea4.kabupaten, kabupaten),
+                ) : branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.kabupaten)
                 .as('a')
 
@@ -658,7 +832,7 @@ const app = new Hono()
                 .groupBy(kabupatenTerritory.kabupaten)
 
             const [finalDataRevenue] = await Promise.all([
-                unionAll(revenueRegional, branchHeaderQuery, revenueBranch, clusterHeaderQuery, revenueCluster, kabupatenHeaderQuery, revenueKabupaten)
+                unionAll(revenueRegional, branchHeaderQuery, revenueBranch, subbranchHeaderQuery, revenueSubbranch, clusterHeaderQuery, revenueCluster, kabupatenHeaderQuery, revenueKabupaten)
             ])
 
             return c.json({ data: finalDataRevenue }, 200)
@@ -1523,9 +1697,9 @@ const app = new Hono()
 
             return c.json({ data: finalDataRevenue }, 200)
         })
-    .get('/paying-subs', zValidator('query', z.object({ date: z.coerce.date().optional() })),
+    .get('/paying-subs', zValidator('query', z.object({ date: z.coerce.date().optional(), branch: z.string().optional(), subbranch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })),
         async c => {
-            const { date } = c.req.valid('query')
+            const { date, branch, subbranch, cluster, kabupaten } = c.req.valid('query')
             const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
 
             const lastDayOfSelectedMonth = endOfMonth(selectedDate);
@@ -1704,7 +1878,10 @@ const app = new Hono()
                     branch: territoryArea4.branch,
                 })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    branch ? eq(territoryArea4.branch, branch) : undefined
+                ))
                 .groupBy(territoryArea4.branch)
                 .as('a')
 
@@ -1818,43 +1995,184 @@ const app = new Hono()
                 .leftJoin(summaryRevBranch, eq(branchTerritory.branch, summaryRevBranch.branch))
                 .groupBy(branchTerritory.branch)
 
-            // const subbranchHeaderQuery = db
-            //     .selectDistinct({
-            //         name: sql<string | null>`'SUBBRANCH'`,
-            //         target_rgb_all: sql<number>`''`,
-            //         mtd_rgb: sql<number>`''`,
-            //         mom_rgb: sql<string>`''`,
-            //         yoy_rgb: sql<string>`''`,
-            //         ach_target_fm_rgb: sql<string>`''`,
-            //         drr_rgb: sql<string>`''`,
-            //         gap_to_target_rgb: sql<string>`''`,
-            //         penetration_to_cb: sql<string>`''`,
+            const subbranchHeaderQuery = db
+                .selectDistinct({
+                    name: sql<string | null>`'SUBBRANCH'`,
+                    target_rgb_all: sql<number>`''`,
+                    mtd_rgb: sql<number>`''`,
+                    mom_rgb: sql<string>`''`,
+                    yoy_rgb: sql<string>`''`,
+                    ach_target_fm_rgb: sql<string>`''`,
+                    drr_rgb: sql<string>`''`,
+                    gap_to_target_rgb: sql<string>`''`,
+                    penetration_to_cb: sql<string>`''`,
 
-            //         mtd_rgb_data: sql<number>`''`,
-            //         mom_rgb_data: sql<string>`''`,
-            //         yoy_rgb_data: sql<string>`''`,
+                    mtd_rgb_data: sql<number>`''`,
+                    mom_rgb_data: sql<string>`''`,
+                    yoy_rgb_data: sql<string>`''`,
 
-            //         mtd_rgb_digital: sql<number>`''`,
-            //         mom_rgb_digital: sql<string>`''`,
-            //         yoy_rgb_digital: sql<string>`''`,
+                    mtd_rgb_digital: sql<number>`''`,
+                    mom_rgb_digital: sql<string>`''`,
+                    yoy_rgb_digital: sql<string>`''`,
 
-            //         mtd_arpu: sql<number>`''`,
-            //         mom_arpu: sql<string>`''`,
-            //         yoy_arpu: sql<string>`''`,
+                    mtd_arpu: sql<number>`''`,
+                    mom_arpu: sql<string>`''`,
+                    yoy_arpu: sql<string>`''`,
 
-            //         mtd_arpu_data: sql<number>`''`,
-            //         mom_arpu_data: sql<string>`''`,
-            //         yoy_arpu_data: sql<string>`''`,
+                    mtd_arpu_data: sql<number>`''`,
+                    mom_arpu_data: sql<string>`''`,
+                    yoy_arpu_data: sql<string>`''`,
 
-            //         mtd_arpu_digital: sql<number>`''`,
-            //         mom_arpu_digital: sql<string>`''`,
-            //         yoy_arpu_digital: sql<string>`''`,
+                    mtd_arpu_digital: sql<number>`''`,
+                    mom_arpu_digital: sql<string>`''`,
+                    yoy_arpu_digital: sql<string>`''`,
 
-            //         mtd_rpmb: sql<number>`''`,
-            //         mom_rpmb: sql<string>`''`,
-            //         yoy_rpmb: sql<string>`''`,
-            //     })
-            //     .from(feiTargetPuma)
+                    mtd_rpmb: sql<number>`''`,
+                    mom_rpmb: sql<string>`''`,
+                    yoy_rpmb: sql<string>`''`,
+                })
+                .from(feiTargetPuma)
+
+            const subbranchTerritory = db
+                .select({
+                    subbranch: territoryArea4.subbranch,
+                })
+                .from(territoryArea4)
+                .where(branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch)
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch)
+                ) : eq(territoryArea4.regional, 'PUMA'))
+                .groupBy(territoryArea4.subbranch)
+                .as('a')
+
+            const rgbSubbranch = db
+                .select({
+                    subbranch: sql<string>`
+                    CASE
+                        WHEN kabupaten IN ('AMBON','KOTA AMBON','MALUKU TENGAH','SERAM BAGIAN TIMUR') THEN 'AMBON'
+                        WHEN kabupaten IN ('KEPULAUAN ARU','KOTA TUAL','MALUKU BARAT DAYA','MALUKU TENGGARA','MALUKU TENGGARA BARAT','KEPULAUAN TANIMBAR') THEN 'KEPULAUAN AMBON'
+                        WHEN kabupaten IN ('BURU', 'BURU SELATAN', 'SERAM BAGIAN BARAT') THEN 'SERAM BURU'
+                        WHEN kabupaten IN ('KOTA JAYAPURA') THEN 'JAYAPURA'
+                        WHEN kabupaten IN ('JAYAPURA','KEEROM','MAMBERAMO RAYA','SARMI','BIAK','BIAK NUMFOR','KEPULAUAN YAPEN','SUPIORI','WAROPEN','JAYAWIJAYA','LANNY JAYA','MAMBERAMO TENGAH','NDUGA','PEGUNUNGAN BINTANG','TOLIKARA','YAHUKIMO','YALIMO') THEN 'SENTANI'
+                        WHEN kabupaten IN ('MANOKWARI') THEN 'MANOKWARI'
+                        WHEN kabupaten IN ('FAKFAK','FAK FAK','KAIMANA','MANOKWARI SELATAN','PEGUNUNGAN ARFAK','TELUK BINTUNI','TELUK WONDAMA') THEN 'MANOKWARI OUTER'
+                        WHEN kabupaten IN ('KOTA SORONG','MAYBRAT','RAJA AMPAT','SORONG','SORONG SELATAN','TAMBRAUW') THEN 'SORONG RAJA AMPAT'
+                        WHEN kabupaten IN ('ASMAT', 'BOVEN DIGOEL', 'MAPPI', 'MERAUKE') THEN 'MERAUKE'
+                        WHEN kabupaten IN ('INTAN JAYA','MIMIKA','PUNCAK','PUNCAK JAYA','TIMIKA') THEN 'MIMIKA'
+                        WHEN kabupaten IN ('DEIYAI', 'DOGIYAI', 'NABIRE', 'PANIAI') THEN 'NABIRE'
+                        ELSE NULL
+                    END
+                    `.as('subbranch'),
+                    cbLastYear: summaryRgbHqKabupaten.cb_m12,
+                    cbLastMonth: summaryRgbHqKabupaten.cb_m1,
+                    mtdCb: summaryRgbHqKabupaten.cb_mtd,
+                    rgbLastYear: summaryRgbHqKabupaten.rgb_m12,
+                    rgbLastMonth: summaryRgbHqKabupaten.rgb_m1,
+                    mtdRgb: summaryRgbHqKabupaten.rgb_mtd,
+                    rgbDataLastYear: summaryRgbHqKabupaten.rgb_data_m12,
+                    rgbDataLastMonth: summaryRgbHqKabupaten.rgb_data_m1,
+                    mtdRgbData: summaryRgbHqKabupaten.rgb_data_mtd,
+                    rgbDigitalLastYear: summaryRgbHqKabupaten.rgb_digital_m12,
+                    rgbDigitalLastMonth: summaryRgbHqKabupaten.rgb_digital_m1,
+                    mtdRgbDigital: summaryRgbHqKabupaten.rgb_digital_mtd,
+                    payloadLastYear: summaryRgbHqKabupaten.payload_user_m12,
+                    payloadLastMonth: summaryRgbHqKabupaten.payload_user_m1,
+                    mtdPayload: summaryRgbHqKabupaten.payload_user_mtd
+                })
+                .from(summaryRgbHqKabupaten)
+                .where(and(
+                    eq(summaryRgbHqKabupaten.event_date, currDate),
+                    eq(summaryRgbHqKabupaten.regional, 'PUMA'),
+                    eq(summaryRgbHqKabupaten.catlos, 'all'),
+                    eq(summaryRgbHqKabupaten.brand, 'all')
+                ))
+                .groupBy(sql`1`)
+                .as('b')
+
+            const subbranchTargetRevenue = db
+                .select({
+                    subbranch: territoryArea4.subbranch,
+                    target_paying_subs: sum(feiTargetPuma.paying_subs).as('target_paying_subs')
+                })
+                .from(feiTargetPuma)
+                .rightJoin(territoryArea4, eq(feiTargetPuma.territory, territoryArea4.kabupaten))
+                .where(eq(feiTargetPuma.periode, yyyyMM))
+                .groupBy(territoryArea4.subbranch)
+                .as('c')
+
+            const summaryRevSubbranch = db
+                .select({
+                    subbranch: summaryRevAllSubbranch.subbranch,
+                    revAllM: summaryRevAllSubbranch.rev_all_m,
+                    revAllM1: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevDate} THEN ${summaryRevAllSubbranch.rev_all_m} END)`.as('rev_all_m1'),
+                    revAllM12: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevYearCurrDate} THEN ${summaryRevAllSubbranch.rev_all_m} END)`.as('rev_all_m12'),
+
+                    revBbM: summaryRevAllSubbranch.rev_bb_m,
+                    revBbM1: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevDate} THEN ${summaryRevAllSubbranch.rev_bb_m} END)`.as('rev_bb_m1'),
+                    revBbM12: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevYearCurrDate} THEN ${summaryRevAllSubbranch.rev_bb_m} END)`.as('rev_bb_m12'),
+
+                    revVoiceM: summaryRevAllSubbranch.rev_voice_m,
+                    revVoiceM1: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevDate} THEN ${summaryRevAllSubbranch.rev_voice_m} END)`.as('rev_voice_m1'),
+                    revVoiceM12: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevYearCurrDate} THEN ${summaryRevAllSubbranch.rev_voice_m} END)`.as('rev_voice_m12'),
+
+                    revDigitalM: summaryRevAllSubbranch.rev_digital_m,
+                    revDigitalM1: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevDate} THEN ${summaryRevAllSubbranch.rev_digital_m} END)`.as('rev_digital_m1'),
+                    revDigitalM12: sql<number>`SUM(CASE WHEN ${summaryRevAllSubbranch.tgl} = ${prevYearCurrDate} THEN ${summaryRevAllSubbranch.rev_digital_m} END)`.as('rev_digital_m12')
+                })
+                .from(summaryRevAllSubbranch)
+                .where(and(
+                    eq(summaryRevAllSubbranch.regional, 'PUMA'),
+                    eq(summaryRevAllSubbranch.newAbcStrate, 'all')
+                ))
+                .groupBy(summaryRevAllSubbranch.branch)
+                .as('d')
+
+            const revenueSubbranch = db
+                .select({
+                    name: subbranchTerritory.subbranch,
+                    target_rgb_all: sql<number>`ROUND(SUM(${subbranchTargetRevenue.target_paying_subs}),0)`.as('target_rgb_all'),
+                    mtd_rgb: sql<number>`ROUND(SUM(${rgbSubbranch.mtdRgb}),0)`.as('mtd_rgb'),
+                    mom_rgb: sql<string>`CONCAT(ROUND(((SUM(${rgbSubbranch.mtdRgb})/SUM(${rgbSubbranch.rgbLastMonth}))-1)*100,2),'%')`.as('mom_rgb'),
+                    yoy_rgb: sql<string>`CONCAT(ROUND(((SUM(${rgbSubbranch.mtdRgb})/SUM(${rgbSubbranch.rgbLastYear}))-1)*100,2),'%')`.as('yoy_rgb'),
+
+                    ach_target_fm_rgb: sql<string>`CONCAT(ROUND((SUM(${rgbSubbranch.mtdRgb})/SUM(${subbranchTargetRevenue.target_paying_subs}))*100,2),'%')`.as('ach_target_fm_rgb'),
+                    drr_rgb: sql<string>`CONCAT(ROUND((SUM(${rgbSubbranch.mtdRgb})/(${today}/${daysInMonth}*(SUM(${subbranchTargetRevenue.target_paying_subs}))))*100,2),'%')`.as('drr_rgb'),
+                    gap_to_target_rgb: sql<string>`ROUND((COALESCE(SUM(${rgbSubbranch.mtdRgb}) - SUM(${subbranchTargetRevenue.target_paying_subs}),0)),0)`.as('gap_to_target_rgb'),
+                    penetration_to_cb: sql<string>`CONCAT(ROUND((SUM(${rgbSubbranch.mtdRgb})/SUM(${rgbSubbranch.mtdCb})*100),2),'%')`.as('penetration_to_cb'),
+
+                    mtd_rgb_data: sql<number>`ROUND(SUM(${rgbSubbranch.mtdRgbData}),0)`.as('mtd_rgb_data'),
+                    mom_rgb_data: sql<string>`CONCAT(ROUND((((SUM(${rgbSubbranch.mtdRgbData})/SUM(${rgbSubbranch.rgbDataLastMonth}))-1)*100),2),'%')`.as('mom_rgb_data'),
+                    yoy_rgb_data: sql<string>`CONCAT(ROUND((((SUM(${rgbSubbranch.mtdRgbData})/SUM(${rgbSubbranch.rgbDataLastYear}))-1)*100),2),'%')`.as('yoy_rgb_data'),
+
+                    mtd_rgb_digital: sql<number>`ROUND(SUM(${rgbSubbranch.mtdRgbDigital}),0)`.as('mtd_rgb_digital'),
+                    mom_rgb_digital: sql<string>`CONCAT(ROUND((((SUM(${rgbSubbranch.mtdRgbDigital})/SUM(${rgbSubbranch.rgbDigitalLastMonth}))-1)*100),2),'%')`.as('mom_rgb_digital'),
+                    yoy_rgb_digital: sql<string>`CONCAT(ROUND((((SUM(${rgbSubbranch.mtdRgbDigital})/SUM(${rgbSubbranch.rgbDigitalLastYear}))-1)*100),2),'%')`.as('yoy_rgb_digital'),
+
+                    mtd_arpu: sql<number>`ROUND(SUM(${summaryRevSubbranch.revAllM})/SUM(${rgbSubbranch.mtdRgb}),0)`.as('mtd_arpu'),
+                    mom_arpu: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revAllM})/SUM(${rgbSubbranch.mtdRgb}))/(SUM(${summaryRevSubbranch.revAllM1})/SUM(${rgbSubbranch.rgbDataLastMonth})))-1)*100,2),'%')`.as('mom_arpu'),
+                    yoy_arpu: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revAllM})/SUM(${rgbSubbranch.mtdRgb}))/(SUM(${summaryRevSubbranch.revAllM12})/SUM(${rgbSubbranch.rgbDataLastYear})))-1)*100,2),'%')`.as('yoy_arpu'),
+
+                    mtd_arpu_data: sql<number>`ROUND(SUM(${summaryRevSubbranch.revBbM})/SUM(${rgbSubbranch.mtdRgbData}),0)`.as('mtd_arpu_data'),
+                    mom_arpu_data: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revBbM})/SUM(${rgbSubbranch.mtdRgbData}))/(SUM(${summaryRevSubbranch.revBbM1})/SUM(${rgbSubbranch.rgbDataLastMonth})))-1)*100,2),'%')`.as('mom_arpu_data'),
+                    yoy_arpu_data: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revBbM})/SUM(${rgbSubbranch.mtdRgbData}))/(SUM(${summaryRevSubbranch.revBbM12})/SUM(${rgbSubbranch.rgbDataLastYear})))-1)*100,2),'%')`.as('yoy_arpu_data'),
+
+                    mtd_arpu_digital: sql<number>`ROUND(SUM(${summaryRevSubbranch.revDigitalM})/SUM(${rgbSubbranch.mtdRgbDigital}),0)`.as('mtd_arpu_digital'),
+                    mom_arpu_digital: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revDigitalM})/SUM(${rgbSubbranch.mtdRgbDigital}))/(SUM(${summaryRevSubbranch.revDigitalM1})/SUM(${rgbSubbranch.rgbDigitalLastMonth})))-1)*100,2),'%')`.as('mom_arpu_digital'),
+                    yoy_arpu_digital: sql<string>`CONCAT(ROUND((((SUM(${summaryRevSubbranch.revDigitalM})/SUM(${rgbSubbranch.mtdRgbDigital}))/(SUM(${summaryRevSubbranch.revDigitalM12})/SUM(${rgbSubbranch.rgbDigitalLastYear})))-1)*100,2),'%')`.as('yoy_arpu_digital'),
+
+                    mtd_rpmb: sql<number>`ROUND(SUM(${summaryRevSubbranch.revAllM})/(SUM(${rgbSubbranch.mtdPayload})/1024),2)`.as('mtd_rpmb'),
+                    mom_rpmb: sql<string>`CONCAT(ROUND(((SUM(${summaryRevSubbranch.revAllM})/(SUM(${rgbSubbranch.mtdPayload})/1024)) / (SUM(${summaryRevSubbranch.revAllM1})/(SUM(${rgbSubbranch.payloadLastMonth})/1024))-1)*100,2),'%')`.as('mom_rpmb'),
+                    yoy_rpmb: sql<string>`CONCAT(ROUND(((SUM(${summaryRevSubbranch.revAllM})/(SUM(${rgbSubbranch.mtdPayload})/1024)) / (SUM(${summaryRevSubbranch.revAllM12})/(SUM(${rgbSubbranch.payloadLastYear})/1024))-1)*100,2),'%')`.as('yoy_rpmb'),
+                })
+                .from(subbranchTerritory)
+                .leftJoin(rgbSubbranch, eq(subbranchTerritory.subbranch, sql`b.subbranch`))
+                .leftJoin(subbranchTargetRevenue, eq(subbranchTerritory.subbranch, subbranchTargetRevenue.subbranch))
+                .leftJoin(summaryRevSubbranch, eq(subbranchTerritory.subbranch, summaryRevSubbranch.subbranch))
+                .groupBy(subbranchTerritory.subbranch)
 
             const clusterHeaderQuery = db
                 .selectDistinct({
@@ -1899,7 +2217,19 @@ const app = new Hono()
                     cluster: territoryArea4.cluster,
                 })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.cluster)
                 .as('a')
 
@@ -2056,7 +2386,25 @@ const app = new Hono()
                     kabupaten: territoryArea4.kabupaten,
                 })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster && kabupaten ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                    eq(territoryArea4.kabupaten, kabupaten),
+                ) : branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.kabupaten)
                 .as('a')
 
@@ -2171,7 +2519,7 @@ const app = new Hono()
                 .groupBy(kabupatenTerritory.kabupaten)
 
             const [finalDataRevenue] = await Promise.all([
-                unionAll(revenueRegional, branchHeaderQuery, revenueBranch, clusterHeaderQuery, revenueCluster, kabupatenHeaderQuery, revenueKabupaten)
+                unionAll(revenueRegional, branchHeaderQuery, revenueBranch, subbranchHeaderQuery, revenueSubbranch, clusterHeaderQuery, revenueCluster, kabupatenHeaderQuery, revenueKabupaten)
             ])
 
             return c.json({ data: finalDataRevenue }, 200)

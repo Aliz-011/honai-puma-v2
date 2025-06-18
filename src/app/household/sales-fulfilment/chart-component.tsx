@@ -262,8 +262,8 @@ export function ChartPie({ data, date }: PieParams) {
                 <CardDescription>{date}</CardDescription>
             </CardHeader>
             <CardContent className=" max-h-full">
-                <ChartContainer config={chartConfigPie} className="mx-auto aspect-square max-h-[420px] pb-0 pt-0">
-                    <PieChart margin={{ top: 20, bottom: 80, left: 20, right: 20 }}>
+                <ChartContainer config={chartConfigPie} className="mx-auto aspect-square max-h-[440px] pb-0 pt-0">
+                    <PieChart margin={{ top: 10, bottom: 80, left: 10, right: 10 }}>
                         <ChartTooltip content={<ChartTooltipContent labelKey="visitors" className='w-[180px]' />} />
                         <Pie
                             data={chartData}

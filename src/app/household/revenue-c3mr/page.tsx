@@ -14,8 +14,8 @@ import { ProgressCard } from "./progress-card"
 
 const Page = () => {
     const { date: selectedDate } = useSelectDate()
-    const { branch } = useSelectBranch()
-    const { wok } = useSelectWok()
+    const { branch, setSelectedBranch } = useSelectBranch()
+    const { wok, setSelectedWok } = useSelectWok()
     const [fetchDataClicked, setFetchDataClicked] = useState(false);
 
     const { data, isLoading, error, refetch, isRefetching, isError, isSuccess } = useQuery({
@@ -41,18 +41,14 @@ const Page = () => {
             const { data } = await response.json()
             return data
         },
-        enabled: false,
         refetchOnWindowFocus: false,
         retry: 1,
         gcTime: 5 * 60 * 1000,
     })
 
     const handleClick = () => {
-        refetch()
-        if (!fetchDataClicked) {
-            console.log({ branch })
-            setFetchDataClicked(true);
-        }
+        setSelectedWok('')
+        setSelectedBranch('')
     };
 
     const isDataActuallyAvailable = data && data.length > 0;
@@ -60,7 +56,7 @@ const Page = () => {
     return (
         <div className="overflow-hidden rounded-xl space-y-4">
             <div className="py-2">
-                <Filters daysBehind={2} handleClick={handleClick} />
+                <Filters daysBehind={2} handleClick={handleClick} disabled={isLoading || isRefetching} />
             </div>
 
             {(() => {
@@ -211,12 +207,12 @@ export default Page
 const getValueStyle = (value: number, isPercentage = false, isGap = false) => {
     if (isGap) {
         return value > 0 ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white' :
-            value < 0 ? 'bg-gradient-to-br from-red-500 to-red-600 text-white' :
+            value < 0 ? 'bg-gradient-to-br from-rose-500 to-rose-600 text-white' :
                 'bg-gradient-to-br from-gray-500 to-gray-600 text-white';
     }
 
     if (isPercentage) {
-        return value >= 100 ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white' : 'bg-gradient-to-br from-red-500 to-red-600 text-white';
+        return value >= 100 ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white' : 'bg-gradient-to-br from-rose-500 to-rose-600 text-white';
     }
 
     return 'bg-gradient-to-br from-gray-500 to-gray-600 text-white';
