@@ -1,6 +1,7 @@
 import React from "react"
 import type { QueryObserverResult, RefetchOptions } from "@tanstack/react-query"
-import { endOfMonth, intlFormat, subDays } from "date-fns"
+import { endOfMonth, format, intlFormat, subDays } from "date-fns"
+import { Download } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -15,7 +16,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from "@/components/ui/skeleton"
 
-import { cn, formatToBillion, getAchGrowthColor, getGrowthColor } from "@/lib/utils"
+import { cn, exportToExcel, formatToBillion, getAchGrowthColor, getGrowthColor } from "@/lib/utils"
 
 type Params = {
     data?: Revenue[];
@@ -55,10 +56,31 @@ export function DataTable({ latestUpdatedData: daysBehind, refetch, title, data,
         )
     }
 
+    const formattedData = data.map(item => ({
+        territory: item.name,
+        target: item.target_rev_ns_prepaid,
+        rev: item.rev_ns,
+        gap: item.gap_to_target_ns,
+        achFm: item.ach_target_fm_ns,
+        drr: item.drr_ns,
+        mom: item.mom_ns,
+        abs: 0,
+        yoy: item.yoy_ns,
+        ytd: item.ytd_ns,
+        qoq: ''
+    }))
+
+    const handleDownload = async () => {
+        exportToExcel(formattedData, format(selectedDate, 'd MMM'), `revenue_new_sales_prabayar_${format(selectedDate, 'yyyyMM')}`)
+    }
+
     return (
         <Card>
-            <CardHeader>
+            <CardHeader className="flex items-center justify-between">
                 <CardTitle>{title}</CardTitle>
+                <Button variant='outline' size='sm' className="cursor-pointer" onClick={handleDownload}>
+                    <Download className="size-4" />
+                </Button>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -89,9 +111,7 @@ export function DataTable({ latestUpdatedData: daysBehind, refetch, title, data,
                                     MoM(%)
                                 </div>
                             </TableHead>
-                            {/* <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">
-                                Gap MoM
-                            </TableHead> */}
+
                             <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">
                                 <div className="flex items-center justify-center">
                                     YoY

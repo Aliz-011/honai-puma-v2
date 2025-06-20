@@ -1,5 +1,5 @@
 import React from "react"
-import { ArrowUpDown } from "lucide-react"
+import { ArrowUpDown, Download } from "lucide-react"
 import type { QueryObserverResult, RefetchOptions } from "@tanstack/react-query"
 import { endOfMonth, format, getDaysInMonth, intlFormat, subDays, subMonths, subYears } from "date-fns"
 
@@ -20,7 +20,7 @@ import { useSelectSubbranch } from "@/hooks/use-select-subbranch"
 import { useSelectCluster } from "@/hooks/use-select-cluster"
 import { useSelectKabupaten } from "@/hooks/use-select-kabupaten"
 import { Skeleton } from "@/components/ui/skeleton"
-import { cn, formatToBillion, gapToTarget, getAchGrowthColor, getGrowthColor } from "@/lib/utils"
+import { cn, exportToExcel, formatToBillion, gapToTarget, getAchGrowthColor, getGrowthColor } from "@/lib/utils"
 
 type Params = {
     data?: Revenue[];
@@ -73,10 +73,31 @@ export const DataTable = ({ latestUpdatedData: daysBehind, refetch, title, data,
         )
     }
 
+    const formattedData = data.map(item => ({
+        territory: item.name,
+        target: item.targetAll,
+        rev: item.revAll,
+        gap: item.gapToTargetAll,
+        achFm: item.achTargetFmAll,
+        drr: item.drrAll,
+        mom: item.momAll,
+        abs: item.revAbsolut,
+        yoy: item.yoyAll,
+        ytd: item.ytdAll,
+        qoq: ''
+    }))
+
+    const handleDownload = async () => {
+        exportToExcel(formattedData, format(selectedDate, 'd MMM'), `revenue_gross_parabayar_${format(selectedDate, 'yyyyMM')}`)
+    }
+
     return (
         <Card>
-            <CardHeader>
+            <CardHeader className="flex items-center justify-between">
                 <CardTitle>{title}</CardTitle>
+                <Button variant='outline' size='sm' className="cursor-pointer" onClick={handleDownload}>
+                    <Download className="size-4" />
+                </Button>
             </CardHeader>
             <CardContent>
                 <Table>
