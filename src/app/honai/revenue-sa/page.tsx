@@ -1,18 +1,42 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
+
 import { Filters } from '../filters'
 import { DataTable } from './data-table'
 
 import { useSelectDate } from '@/hooks/use-select-date'
-import { useQuery } from '@tanstack/react-query'
 import { client } from '@/lib/client'
+import { useSelectBranch } from '@/hooks/use-select-branch'
+import { useSelectSubbranch } from '@/hooks/use-select-subbranch'
+import { useSelectCluster } from '@/hooks/use-select-cluster'
+import { useSelectKabupaten } from '@/hooks/use-select-kabupaten'
 
 export default function RevenueSAPage() {
     const { date } = useSelectDate()
+    const { branch } = useSelectBranch()
+    const { subbranch } = useSelectSubbranch()
+    const { cluster } = useSelectCluster()
+    const { kabupaten } = useSelectKabupaten()
+
     const { data, isLoading, isRefetching, refetch } = useQuery({
-        queryKey: ['revenue-sa', date],
-        queryFn: async () => {
-            const response = await client.api['revenue-sa'].$get({ query: { date: date?.toLocaleString() } })
+        queryKey: ['revenue-sa', date, branch, subbranch, cluster, kabupaten],
+        queryFn: async ({ queryKey }) => {
+            const [_key, dateQuery, branchQuery, subbranchQuery, clusterQuery, kabupatenQuery] = queryKey;
+
+            const dateString = dateQuery instanceof Date
+                ? dateQuery.toISOString()
+                : (typeof dateQuery === 'string' ? dateQuery : undefined);
+
+            const response = await client.api['revenue-sa'].$get({
+                query: {
+                    date: dateString,
+                    branch: branchQuery as string,
+                    subbranch: subbranchQuery as string,
+                    cluster: clusterQuery as string,
+                    kabupaten: kabupatenQuery as string,
+                }
+            })
 
             if (!response.ok) {
                 throw new Error('Failed to fetch data')

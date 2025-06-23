@@ -111,8 +111,6 @@ export const DataTable = ({ latestUpdatedData: daysBehind, refetch, title, data,
                             <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">Target</TableHead>
                             <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">{intlFormat(endOfCurrMonth, { dateStyle: "medium" }, { locale: "id-ID" })}</TableHead>
                             <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">Gap To Target</TableHead>
-                            {/* <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">YtD {selectedDate.getFullYear()}</TableHead>
-                            <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">YtD {selectedDate.getFullYear() - 1}</TableHead> */}
                             <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">
                                 <div className="flex items-center justify-center">
                                     Ach FM
@@ -166,13 +164,6 @@ export const DataTable = ({ latestUpdatedData: daysBehind, refetch, title, data,
                                     <TableCell className={cn("px-1 py-0.5 border-r last:border-r-0 text-end text-theme-xs dark:text-white dark:border-gray-800 !tabular-nums", regional.currMonthRevenue - regional.currMonthTarget > 0 ? 'text-green-500' : 'text-rose-500')}>
                                         <span className='text-end'>{formatToBillion(regional.currMonthRevenue - regional.currMonthTarget)}</span>
                                     </TableCell>
-                                    {/* <TableCell className="px-1 py-0.5 border-r last:border-r-0 text-end text-theme-xs dark:text-white dark:border-gray-800 !tabular-nums">
-                                        <span>{formatToBillion(regional.currYtdRevenue)}</span>
-                                    </TableCell>
-                                    <TableCell className="px-1 py-0.5 border-r last:border-r-0 text-end text-theme-xs dark:text-white dark:border-gray-800 !tabular-nums">
-                                        <span>{formatToBillion(regional.prevYtdRevenue)}</span>
-                                    </TableCell> */}
-                                    {/* ACH FM */}
                                     <TableCell className="px-1 py-0.5 border-r last:border-r-0 text-end text-theme-xs dark:text-white dark:border-gray-800 !tabular-nums">
                                         <span className={cn(getAchGrowthColor(regional.currMonthRevenue / regional.currMonthTarget * 100) ? 'text-green-500' : 'text-rose-500')}>
                                             {formatToPercentage(regional.currMonthRevenue / regional.currMonthTarget)}

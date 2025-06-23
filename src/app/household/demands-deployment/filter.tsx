@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import DatePicker from 'react-datepicker'
-import { getDaysInMonth, getMonth, getYear, subDays, setDate } from 'date-fns'
+import { getDaysInMonth, getMonth, getYear, subDays } from 'date-fns'
 
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -25,7 +25,7 @@ import { client } from '@/lib/client';
 import { Button } from '@/components/ui/button';
 import { FolderTree } from 'lucide-react';
 
-export const Filters = ({ daysBehind, handleClick }: { daysBehind: number, handleClick: () => void }) => {
+export const Filters = ({ daysBehind, handleClick, disabled = false }: { daysBehind: number, handleClick: () => void, disabled?: boolean }) => {
     const { date: selectedDate, setDate: setSelectedDate } = useSelectDate()
     const { region: selectedRegion, setSelectedRegion } = useSelectRegion()
     const { branch: selectedBranch, setSelectedBranch } = useSelectBranch()
@@ -166,7 +166,7 @@ export const Filters = ({ daysBehind, handleClick }: { daysBehind: number, handl
             </div>
             <div className='space-y-2'>
                 <Label>Branch</Label>
-                <Select onValueChange={handleBranchChange}>
+                <Select onValueChange={handleBranchChange} defaultValue="" value={selectedBranch}>
                     <SelectTrigger className='w-full' disabled={!selectedRegion}>
                         <SelectValue placeholder='Select Branch' />
                     </SelectTrigger>
@@ -179,7 +179,7 @@ export const Filters = ({ daysBehind, handleClick }: { daysBehind: number, handl
             </div>
             <div className='space-y-2'>
                 <Label>WOK</Label>
-                <Select onValueChange={handleWokChange}>
+                <Select onValueChange={handleWokChange} defaultValue="" value={wok}>
                     <SelectTrigger disabled={!selectedBranch} className='w-full'>
                         <SelectValue placeholder='Select WOK' />
                     </SelectTrigger>
@@ -191,9 +191,9 @@ export const Filters = ({ daysBehind, handleClick }: { daysBehind: number, handl
                 </Select>
             </div>
             <div className="space-y-2 mt-auto">
-                <Button onClick={handleClick} disabled={!selectedBranch} className="cursor-pointer">
+                <Button onClick={handleClick} disabled={!selectedBranch || (!selectedBranch && !wok) || disabled} className="cursor-pointer">
                     <FolderTree />
-                    Tampilkan data
+                    Clear Filter
                 </Button>
             </div>
         </div>

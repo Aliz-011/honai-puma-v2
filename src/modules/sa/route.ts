@@ -26,9 +26,9 @@ import { summarySaAllRegional, summarySaAllBranch, summarySaAllSubbranch, summar
 import type { CurrYtDRevenue, PrevYtDRevenue, Regional } from "@/types";
 
 const app = new Hono()
-    .get('/revenue-sa', zValidator('query', z.object({ date: z.coerce.date().optional() })),
+    .get('/revenue-sa', zValidator('query', z.object({ date: z.coerce.date().optional(), branch: z.string().optional(), subbranch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })),
         async c => {
-            const { date } = c.req.valid('query')
+            const { date, branch, subbranch, cluster, kabupaten } = c.req.valid('query')
             const selectedDate = date ? new Date(date) : subDays(new Date(), 3)
 
             const currMonth = format(selectedDate, 'MM')
@@ -108,8 +108,8 @@ const app = new Hono()
                     gap_to_target_sa: sql<number>`ROUND((COALESCE(SUM(${summaryRevRegional.rev_all_m}) - SUM(${regionalTargetRevenue.target_rev_sa}),0)),2)`.as('gap_to_target_sa'),
                     mom_sa: sql<string>`CONCAT(${summaryRevRegional.rev_mom_all}, '%')`.as('mom_sa'),
                     rev_sa_absolut: sql<number>`ROUND(SUM(${summaryRevRegional.rev_all_m} - ${summaryRevRegional.rev_all_m1}),2)`.as('rev_sa_absolut'),
-                    yoy_sa: sql<string>`CONCAT(SUM(${summaryRevRegional.rev_all_m} - ${summaryRevRegional.rev_all_m12})/${summaryRevRegional.rev_all_m12}*100, '%')`.as('yoy_sa'),
-                    ytd_sa: sql<string>`CONCAT(SUM(${summaryRevRegional.rev_all_ytd} - ${summaryRevRegional.rev_all_ytd1})/${summaryRevRegional.rev_all_ytd1}*100, '%')`.as('ytd_sa'),
+                    yoy_sa: sql<string>`CONCAT(ROUND(COALESCE((SUM(${summaryRevRegional.rev_all_m}) - SUM(${summaryRevRegional.rev_all_m12})) / ${summaryRevRegional.rev_all_m12} * 100, 0), 2), '%')`.as('yoy_sa'),
+                    ytd_sa: sql<string>`CONCAT(ROUND(COALESCE((SUM(${summaryRevRegional.rev_all_ytd}) - SUM(${summaryRevRegional.rev_all_ytd1})) / ${summaryRevRegional.rev_all_ytd1} * 100, 0), 2), '%')`.as('ytd_sa'),
                 })
                 .from(regionalSubquery)
                 .leftJoin(summaryRevRegional, eq(regionalSubquery.regional, summaryRevRegional.regional))
@@ -134,7 +134,10 @@ const app = new Hono()
             const branchSubquery = db
                 .select({ branch: territoryArea4.branch })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    branch ? eq(territoryArea4.branch, branch) : undefined
+                ))
                 .groupBy(territoryArea4.branch)
                 .as('a')
 
@@ -181,8 +184,8 @@ const app = new Hono()
                     gap_to_target_sa: sql<number>`ROUND((COALESCE(SUM(${summaryRevBranch.rev_all_m}) - SUM(${branchTargetRevenue.target_rev_sa}),0)),2)`.as('gap_to_target_sa'),
                     mom_sa: sql<string>`CONCAT(${summaryRevBranch.rev_mom_all}, '%')`.as('mom_sa'),
                     rev_sa_absolut: sql<number>`ROUND(SUM(${summaryRevBranch.rev_all_m} - ${summaryRevBranch.rev_all_m1}),2)`.as('rev_sa_absolut'),
-                    yoy_sa: sql<string>`CONCAT(SUM(${summaryRevBranch.rev_all_m} - ${summaryRevBranch.rev_all_m12})/${summaryRevBranch.rev_all_m12}*100, '%')`.as('yoy_sa'),
-                    ytd_sa: sql<string>`CONCAT(SUM(${summaryRevBranch.rev_all_ytd} - ${summaryRevBranch.rev_all_ytd1})/${summaryRevBranch.rev_all_ytd1}*100, '%')`.as('ytd_sa'),
+                    yoy_sa: sql<string>`CONCAT(ROUND(COALESCE((SUM(${summaryRevBranch.rev_all_m}) - SUM(${summaryRevBranch.rev_all_m12})) / ${summaryRevBranch.rev_all_m12} * 100, 0), 2), '%')`.as('yoy_sa'),
+                    ytd_sa: sql<string>`CONCAT(ROUND(COALESCE((SUM(${summaryRevBranch.rev_all_ytd}) - SUM(${summaryRevBranch.rev_all_ytd1})) / ${summaryRevBranch.rev_all_ytd1} * 100, 0), 2), '%')`.as('ytd_sa'),
                 })
                 .from(branchSubquery)
                 .leftJoin(summaryRevBranch, eq(branchSubquery.branch, summaryRevBranch.branch))
@@ -207,7 +210,14 @@ const app = new Hono()
             const subbranchSubquery = db
                 .select({ subbranch: territoryArea4.subbranch })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch)
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch)
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.subbranch)
                 .as('a')
 
@@ -255,8 +265,8 @@ const app = new Hono()
                     gap_to_target_sa: sql<number>`ROUND((COALESCE(SUM(${summaryRevSubbranch.rev_all_m}) - SUM(${subbranchTargetRevenue.target_rev_sa}),0)),2)`.as('gap_to_target_sa'),
                     mom_sa: sql<string>`CONCAT(${summaryRevSubbranch.rev_mom_all}, '%')`.as('mom_sa'),
                     rev_sa_absolut: sql<number>`ROUND(SUM(${summaryRevSubbranch.rev_all_m} - ${summaryRevSubbranch.rev_all_m1}),2)`.as('rev_sa_absolut'),
-                    yoy_sa: sql<string>`CONCAT(SUM(${summaryRevSubbranch.rev_all_m} - ${summaryRevSubbranch.rev_all_m12})/${summaryRevSubbranch.rev_all_m12}*100, '%')`.as('yoy_sa'),
-                    ytd_sa: sql<string>`CONCAT(SUM(${summaryRevSubbranch.rev_all_ytd} - ${summaryRevSubbranch.rev_all_ytd1})/${summaryRevSubbranch.rev_all_ytd1}*100, '%')`.as('ytd_sa'),
+                    yoy_sa: sql<string>`CONCAT(ROUND(COALESCE((SUM(${summaryRevSubbranch.rev_all_m}) - SUM(${summaryRevSubbranch.rev_all_m12})) / ${summaryRevSubbranch.rev_all_m12} * 100, 0), 2), '%')`.as('yoy_sa'),
+                    ytd_sa: sql<string>`CONCAT(ROUND(COALESCE((SUM(${summaryRevSubbranch.rev_all_ytd}) - SUM(${summaryRevSubbranch.rev_all_ytd1})) / ${summaryRevSubbranch.rev_all_ytd1} * 100, 0), 2), '%')`.as('ytd_sa'),
                 })
                 .from(subbranchSubquery)
                 .leftJoin(summaryRevSubbranch, eq(subbranchSubquery.subbranch, summaryRevSubbranch.subbranch))
@@ -281,7 +291,19 @@ const app = new Hono()
             const clusterSubquery = db
                 .select({ cluster: territoryArea4.cluster })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.cluster)
                 .as('a')
 
@@ -330,8 +352,8 @@ const app = new Hono()
                     gap_to_target_sa: sql<number>`ROUND((COALESCE(SUM(${summaryRevCluster.rev_all_m}) - SUM(${clusterTargetRevenue.target_rev_sa}),0)),2)`.as('gap_to_target_sa'),
                     mom_sa: sql<string>`CONCAT(${summaryRevCluster.rev_mom_all}, '%')`.as('mom_sa'),
                     rev_sa_absolut: sql<number>`ROUND(SUM(${summaryRevCluster.rev_all_m} - ${summaryRevCluster.rev_all_m1}),2)`.as('rev_sa_absolut'),
-                    yoy_sa: sql<string>`CONCAT(SUM(${summaryRevCluster.rev_all_m} - ${summaryRevCluster.rev_all_m12})/${summaryRevCluster.rev_all_m12}*100, '%')`.as('yoy_sa'),
-                    ytd_sa: sql<string>`CONCAT(SUM(${summaryRevCluster.rev_all_ytd} - ${summaryRevCluster.rev_all_ytd1})/${summaryRevCluster.rev_all_ytd1}*100, '%')`.as('ytd_sa'),
+                    yoy_sa: sql<string>`CONCAT(ROUND(COALESCE((SUM(${summaryRevCluster.rev_all_m}) - SUM(${summaryRevCluster.rev_all_m12})) / ${summaryRevCluster.rev_all_m12} * 100, 0), 2), '%')`.as('yoy_sa'),
+                    ytd_sa: sql<string>`CONCAT(ROUND(COALESCE((SUM(${summaryRevCluster.rev_all_ytd}) - SUM(${summaryRevCluster.rev_all_ytd1})) / ${summaryRevCluster.rev_all_ytd1} * 100, 0), 2), '%')`.as('ytd_sa'),
                 })
                 .from(clusterSubquery)
                 .leftJoin(summaryRevCluster, eq(clusterSubquery.cluster, summaryRevCluster.cluster))
@@ -356,7 +378,25 @@ const app = new Hono()
             const kabupatenSubquery = db
                 .select({ kabupaten: territoryArea4.kabupaten })
                 .from(territoryArea4)
-                .where(eq(territoryArea4.regional, 'PUMA'))
+                .where(branch && subbranch && cluster && kabupaten ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                    eq(territoryArea4.kabupaten, kabupaten),
+                ) : branch && subbranch && cluster ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                    eq(territoryArea4.cluster, cluster),
+                ) : branch && subbranch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                    eq(territoryArea4.subbranch, subbranch),
+                ) : branch ? and(
+                    eq(territoryArea4.regional, 'PUMA'),
+                    eq(territoryArea4.branch, branch),
+                ) : eq(territoryArea4.regional, 'PUMA'))
                 .groupBy(territoryArea4.kabupaten)
                 .as('a')
 
@@ -405,8 +445,8 @@ const app = new Hono()
                     gap_to_target_sa: sql<number>`ROUND((COALESCE(SUM(${summaryRevKabupaten.rev_all_m}) - SUM(${kabupatenTargetRevenue.target_rev_sa}),0)),2)`.as('gap_to_target_sa'),
                     mom_sa: sql<string>`CONCAT(${summaryRevKabupaten.rev_mom_all}, '%')`.as('mom_sa'),
                     rev_sa_absolut: sql<number>`ROUND(SUM(${summaryRevKabupaten.rev_all_m} - ${summaryRevKabupaten.rev_all_m1}),2)`.as('rev_sa_absolut'),
-                    yoy_sa: sql<string>`CONCAT(SUM(${summaryRevKabupaten.rev_all_m} - ${summaryRevKabupaten.rev_all_m12})/${summaryRevKabupaten.rev_all_m12}*100, '%')`.as('yoy_sa'),
-                    ytd_sa: sql<string>`CONCAT(SUM(${summaryRevKabupaten.rev_all_ytd} - ${summaryRevKabupaten.rev_all_ytd1})/${summaryRevKabupaten.rev_all_ytd1}*100, '%')`.as('ytd_sa'),
+                    yoy_sa: sql<string>`CONCAT(ROUND(COALESCE((SUM(${summaryRevKabupaten.rev_all_m}) - SUM(${summaryRevKabupaten.rev_all_m12})) / ${summaryRevKabupaten.rev_all_m12} * 100, 0), 2), '%')`.as('yoy_sa'),
+                    ytd_sa: sql<string>`CONCAT(ROUND(COALESCE((SUM(${summaryRevKabupaten.rev_all_ytd}) - SUM(${summaryRevKabupaten.rev_all_ytd1})) / ${summaryRevKabupaten.rev_all_ytd1} * 100, 0), 2), '%')`.as('ytd_sa'),
                 })
                 .from(kabupatenSubquery)
                 .leftJoin(summaryRevKabupaten, eq(kabupatenSubquery.kabupaten, summaryRevKabupaten.kabupaten))

@@ -38,7 +38,7 @@ const app = new Hono()
                     region: ihOrderingDetailOrder.region,
                     branch: ihOrderingDetailOrder.branch,
                     wok: ihOrderingDetailOrder.wok,
-                    stoCo: ihOrderingDetailOrder.stoCo,
+                    stoCo: ihOrderingDetailOrder.sto_co,
                     payload: sum(multidim.vol_data_mtd).as('payload'),
                     payloadM1: sum(multidim.vol_data_m1).as('payload_m1'),
                     subs: sql<number>`COUNT(DISTINCT CASE WHEN ${multidim.rev_mtd} > 0 THEN ${multidim.msisdn} END)`.as('subs'),
@@ -51,9 +51,9 @@ const app = new Hono()
                     revM3: sum(multidim.rev_m3).as('rev_m3')
                 })
                 .from(ihOrderingDetailOrder)
-                .leftJoin(fmcMconTable, eq(ihOrderingDetailOrder.serviceId, fmcMconTable.notel))
+                .leftJoin(fmcMconTable, eq(ihOrderingDetailOrder.service_id, fmcMconTable.notel))
                 .leftJoin(multidim, eq(fmcMconTable.msisdnRecommendation, multidim.msisdn))
-                .where(sql`${ihOrderingDetailOrder.orderType} = 'NEW SALES' AND ${ihOrderingDetailOrder.region} = 'MALUKU DAN PAPUA' AND MONTH(${ihOrderingDetailOrder.psTs}) = ${currMonth} AND YEAR(${ihOrderingDetailOrder.psTs}) = ${currYear}`)
+                .where(sql`${ihOrderingDetailOrder.order_type} = 'NEW SALES' AND ${ihOrderingDetailOrder.region} = 'MALUKU DAN PAPUA' AND MONTH(${ihOrderingDetailOrder.ps_ts}) = ${currMonth} AND YEAR(${ihOrderingDetailOrder.ps_ts}) = ${currYear}`)
                 .groupBy(sql`1,2,3,4`)
                 .as('aa')
 
@@ -63,7 +63,7 @@ const app = new Hono()
                     region: ihOrderingDetailOrder.region,
                     branch: ihOrderingDetailOrder.branch,
                     wok: ihOrderingDetailOrder.wok,
-                    stoCo: ihOrderingDetailOrder.stoCo,
+                    stoCo: ihOrderingDetailOrder.sto_co,
                     rgb_data_mtd: sql<number>`COUNT(DISTINCT CASE WHEN ${multidim.rev_data_mtd} > 0 THEN ${multidim.msisdn} END)`.as('rgb_data_mtd'),
                     rgb_data_m1: sql<number>`COUNT(DISTINCT CASE WHEN ${multidim.rev_data_m1} > 0 THEN ${multidim.msisdn} END)`.as('rgb_data_m1'),
                     rgb_data_m2: sql<number>`COUNT(DISTINCT CASE WHEN ${multidim.rev_data_m2} > 0 THEN ${multidim.msisdn} END)`.as('rgb_data_m2'),
@@ -82,9 +82,9 @@ const app = new Hono()
                     rgb_all_m3: sql<number>`COUNT(DISTINCT CASE WHEN ${multidim.rev_m3} > 0 THEN ${multidim.msisdn} END)`.as('rgb_all_m3'),
                 })
                 .from(ihOrderingDetailOrder)
-                .leftJoin(fmcMconTable, eq(ihOrderingDetailOrder.serviceId, fmcMconTable.notel))
+                .leftJoin(fmcMconTable, eq(ihOrderingDetailOrder.service_id, fmcMconTable.notel))
                 .leftJoin(multidim, eq(fmcMconTable.msisdnRecommendation, multidim.msisdn))
-                .where(sql`${ihOrderingDetailOrder.orderType} = 'NEW SALES' AND ${ihOrderingDetailOrder.region} = 'MALUKU DAN PAPUA' AND MONTH(${ihOrderingDetailOrder.psTs}) = ${currMonth} AND YEAR(${ihOrderingDetailOrder.psTs}) = ${currYear}`)
+                .where(sql`${ihOrderingDetailOrder.order_type} = 'NEW SALES' AND ${ihOrderingDetailOrder.region} = 'MALUKU DAN PAPUA' AND MONTH(${ihOrderingDetailOrder.ps_ts}) = ${currMonth} AND YEAR(${ihOrderingDetailOrder.ps_ts}) = ${currYear}`)
                 .groupBy(sql`1,2,3,4`)
                 .as('bb')
 
