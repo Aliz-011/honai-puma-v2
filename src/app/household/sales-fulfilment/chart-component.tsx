@@ -1,6 +1,5 @@
 "use client"
 
-import { endOfMonth, format, startOfMonth } from "date-fns"
 import { Bar, Line, ComposedChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, LabelList } from "recharts"
 
 import {
@@ -18,8 +17,7 @@ import {
     ChartLegend,
     ChartLegendContent,
 } from "@/components/ui/chart"
-import { type SalesFulfilmentResponseData } from "@/types"
-import { Separator } from "@/components/ui/separator"
+import { ResponseData } from "./page"
 
 const chartConfig = {
     target: {
@@ -37,6 +35,7 @@ const chartConfig = {
 } satisfies ChartConfig
 
 
+
 type IOREPSParams = {
     date: string;
     title: string;
@@ -45,9 +44,7 @@ type IOREPSParams = {
         target: number;
         actual: number;
         drr: number;
-        color?: string;
-        ach_fm: string;
-    }[];
+    }[]
 }
 
 export function IOREPSChart({ date, data: chartData, title }: IOREPSParams) {
@@ -58,8 +55,8 @@ export function IOREPSChart({ date, data: chartData, title }: IOREPSParams) {
                 <CardDescription>{date}</CardDescription>
             </CardHeader>
             <CardContent className="pt-0 pb-2.5 px-0">
-                <ChartContainer config={chartConfig} className="aspect-auto h-[280px] w-full">
-                    <ComposedChart data={chartData} margin={{ left: 0, right: 0, bottom: 0, top: 20 }}>
+                <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
+                    <ComposedChart data={chartData} margin={{ left: 0, right: 0, bottom: 0 }}>
                         <CartesianGrid vertical={false} strokeDasharray="3 3" />
                         <XAxis
                             dataKey="territory"
@@ -90,28 +87,14 @@ export function IOREPSChart({ date, data: chartData, title }: IOREPSParams) {
                             fill="var(--color-target)"
                             radius={[2, 2, 0, 0]}
                             maxBarSize={40}
-                        >
-                            <LabelList
-                                position="top"
-                                offset={12}
-                                className="fill-foreground"
-                                fontSize={12}
-                            />
-                        </Bar>
+                        />
                         <Bar
                             yAxisId="bars"
                             dataKey="actual"
                             fill="var(--color-actual)"
                             radius={[2, 2, 0, 0]}
                             maxBarSize={40}
-                        >
-                            <LabelList
-                                position="top"
-                                offset={12}
-                                className="fill-foreground"
-                                fontSize={12}
-                            />
-                        </Bar>
+                        />
                         <Line
                             yAxisId="line"
                             type="monotone"
@@ -119,18 +102,15 @@ export function IOREPSChart({ date, data: chartData, title }: IOREPSParams) {
                             stroke="var(--color-drr)"
                             strokeWidth={3}
                             dot={{ fill: "var(--color-drr)", strokeWidth: 2, r: 4 }}
-                        >
-                            <LabelList
-                                position="top"
-                                offset={12}
-                                className="fill-foreground"
-                                fontSize={12}
-                                formatter={(value: number) => `${value}%`}
-                            />
-                        </Line>
+                        />
                     </ComposedChart>
                 </ChartContainer>
             </CardContent>
+            {/* <CardFooter className="flex-col items-start gap-2 text-sm">
+                <div className="flex gap-2 font-medium leading-none">
+                    Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
+                </div>
+            </CardFooter> */}
         </Card>
     )
 }
@@ -143,8 +123,8 @@ export function BrownGreenChart({ data: chartData, date, title }: IOREPSParams) 
                 <CardDescription>{date}</CardDescription>
             </CardHeader>
             <CardContent className="pt-0 pb-2.5 px-0">
-                <ChartContainer config={chartConfig} className="aspect-auto h-[280px] w-full">
-                    <ComposedChart data={chartData} margin={{ left: 0, right: 0, bottom: 0, top: 20 }}>
+                <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
+                    <ComposedChart data={chartData} margin={{ left: 0, right: 0, bottom: 0 }}>
                         <CartesianGrid vertical={false} strokeDasharray="3 3" />
                         <XAxis
                             dataKey="territory"
@@ -166,7 +146,7 @@ export function BrownGreenChart({ data: chartData, date, title }: IOREPSParams) 
                             axisLine={false}
                         />
                         <ChartTooltip
-                            content={<ChartTooltipContent className="w-[220px]" />}
+                            content={<ChartTooltipContent />}
                         />
                         <ChartLegend content={<ChartLegendContent />} />
                         <Bar
@@ -175,28 +155,14 @@ export function BrownGreenChart({ data: chartData, date, title }: IOREPSParams) 
                             fill="var(--color-target)"
                             radius={[2, 2, 0, 0]}
                             maxBarSize={40}
-                        >
-                            <LabelList
-                                position="top"
-                                offset={12}
-                                className="fill-foreground"
-                                fontSize={12}
-                            />
-                        </Bar>
+                        />
                         <Bar
                             yAxisId="bars"
                             dataKey="actual"
                             fill="var(--color-actual)"
                             radius={[2, 2, 0, 0]}
                             maxBarSize={40}
-                        >
-                            <LabelList
-                                position="top"
-                                offset={12}
-                                className="fill-foreground"
-                                fontSize={12}
-                            />
-                        </Bar>
+                        />
                         <Line
                             yAxisId="line"
                             type="monotone"
@@ -204,15 +170,7 @@ export function BrownGreenChart({ data: chartData, date, title }: IOREPSParams) 
                             stroke="var(--color-drr)"
                             strokeWidth={3}
                             dot={{ fill: "var(--color-drr)", strokeWidth: 2, r: 4 }}
-                        >
-                            <LabelList
-                                position="top"
-                                offset={12}
-                                className="fill-foreground"
-                                fontSize={12}
-                                formatter={(value: number) => `${value}%`}
-                            />
-                        </Line>
+                        />
                     </ComposedChart>
                 </ChartContainer>
             </CardContent>
@@ -226,25 +184,25 @@ const chartConfigPie = {
     },
     digital: {
         label: "Digital",
-        color: "var(--color-sky-400)",
+        color: "var(--chart-1)",
     },
     grapari: {
         label: "GraPari",
-        color: "var(--color-sky-500)",
+        color: "var(--chart-2)",
     },
     agency: {
         label: "Agency",
-        color: "var(--color-red-800)",
+        color: "var(--chart-3)",
     },
     community: {
         label: "Community",
-        color: "var(--color-sky-600)",
+        color: "var(--chart-4)",
     }
 } satisfies ChartConfig
 
 type PieParams = {
     date: string;
-    data: SalesFulfilmentResponseData[]
+    data: ResponseData[]
 }
 
 export function ChartPie({ data, date }: PieParams) {
@@ -256,29 +214,19 @@ export function ChartPie({ data, date }: PieParams) {
     ]
 
     return (
-        <Card className="@container/card flex flex-col max-h-[480px] shadow-none border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] px-0.5 ">
+        <Card className="@container/card flex flex-col max-h-[380px] shadow-none border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] px-0.5">
             <CardHeader>
                 <CardTitle>PS By Channel</CardTitle>
                 <CardDescription>{date}</CardDescription>
             </CardHeader>
-            <CardContent className=" max-h-full">
-                <ChartContainer config={chartConfigPie} className="mx-auto aspect-square max-h-[440px] pb-0 pt-0">
-                    <PieChart margin={{ top: 10, bottom: 80, left: 10, right: 10 }}>
-                        <ChartTooltip content={<ChartTooltipContent labelKey="visitors" className='w-[180px]' />} />
-                        <Pie
-                            data={chartData}
-                            dataKey="ach_fm"
-                            nameKey="channel"
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={0}
-                            outerRadius={80}
-                            label={({ payload, percent }) => payload.ach_fm_per}
-                            labelLine={false}
-                        />
+            <CardContent className="pb-0 flex-1">
+                <ChartContainer config={chartConfigPie} className="[&_.recharts-pie-label-text]:fill-foreground mx-auto my-auto aspect-square max-h-[250px] pb-0 pt-0">
+                    <PieChart margin={{ top: 20, bottom: 20 }}>
+                        <ChartTooltip content={<ChartTooltipContent labelKey="visitors" />} />
+                        <Pie data={chartData} dataKey="ach_fm" label={({ payload }) => payload.ach_fm_per} nameKey="channel" />
                         <ChartLegend
                             content={<ChartLegendContent nameKey="channel" />}
-                            className="my-4 flex-wrap gap-2 *:basis-1/4 *:justify-center"
+                            className="translate-y-2 flex-wrap gap-2 *:basis-1/4 *:justify-center"
                         />
                     </PieChart>
                 </ChartContainer>
@@ -286,83 +234,3 @@ export function ChartPie({ data, date }: PieParams) {
         </Card>
     )
 }
-
-export const ProgressCard = ({ date, data, title }: IOREPSParams) => {
-    const selectedDate = new Date(date)
-    const lastDayOfSelectedMonth = endOfMonth(selectedDate);
-    const isEndOfMonth = selectedDate.getDate() === lastDayOfSelectedMonth.getDate();
-
-    const endOfCurrMonth = isEndOfMonth ? lastDayOfSelectedMonth : selectedDate;
-
-    const currStartOfMonth = format(startOfMonth(selectedDate), 'd')
-    const currDate = format(endOfCurrMonth, 'dd MMM yyyy')
-
-    return (
-        <Card className="w-full text-center bg-white dark:bg-white/[0.03]">
-            <CardHeader className="text-start">
-                <CardTitle className="text-lg font-semibold">{title}</CardTitle>
-                <CardDescription>{currStartOfMonth} - {currDate}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center p-6">
-                {/* Circular Progress Bar */}
-                <div className="relative w-48 h-4w-48">
-                    <svg className="w-full h-full" viewBox="0 0 100 100">
-                        {/* Background circle */}
-                        <circle
-                            className="text-gray-200"
-                            strokeWidth="10"
-                            stroke="currentColor"
-                            fill="transparent"
-                            r="40"
-                            cx="50"
-                            cy="50"
-                        />
-                        {/* Progress circle */}
-                        <circle
-                            className={data[0].color}
-                            strokeWidth="10"
-                            strokeDasharray={2 * Math.PI * 40} // Circumference of circle
-                            strokeDashoffset={2 * Math.PI * 40 * (1 - data[0].drr / 100)}
-                            strokeLinecap="round"
-                            stroke="currentColor"
-                            fill="transparent"
-                            r="40"
-                            cx="50"
-                            cy="50"
-                            style={{
-                                transformOrigin: 'center',
-                                transform: 'rotate(-90deg)',
-                                transition: 'stroke-dashoffset 0.5s ease-in-out',
-                            }}
-                        />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-gray-800">
-                        {data[0].drr}%
-                    </div>
-                </div>
-
-                {/* Weekly and Monthly Progress */}
-                <div className="flex justify-around w-full mt-8">
-                    <div className="flex flex-col items-center">
-                        <span className="text-lg font-bold text-gray-800">{data[0].target}</span>
-                        <span className="text-base text-gray-500">Target</span>
-                    </div>
-
-                    <Separator orientation="vertical" />
-
-                    <div className="flex flex-col items-center">
-                        <span className="text-lg font-bold text-gray-800">{data[0].ach_fm}</span>
-                        <span className="text-base text-gray-500">Ach</span>
-                    </div>
-
-                    <Separator orientation="vertical" />
-
-                    <div className="flex flex-col items-center">
-                        <span className="text-lg font-bold text-gray-800">{data[0].actual}</span>
-                        <span className="text-base text-gray-500">Actual</span>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
-};

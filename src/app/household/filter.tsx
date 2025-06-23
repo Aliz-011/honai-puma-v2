@@ -2,8 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import DatePicker from 'react-datepicker'
-import { subDays } from 'date-fns'
-import { FolderTree } from 'lucide-react';
+import { getDaysInMonth, getMonth, getYear, subDays } from 'date-fns'
 
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -24,12 +23,13 @@ import { useSelectSto } from '@/hooks/use-select-sto';
 import { useSelectDate } from '@/hooks/use-select-date';
 import { client } from '@/lib/client';
 import { Button } from '@/components/ui/button';
+import { FolderTree } from 'lucide-react';
 
-export const Filters = ({ daysBehind, handleClick, disabled }: { daysBehind: number, handleClick: () => void, disabled: boolean }) => {
+export const Filters = ({ daysBehind, handleClick }: { daysBehind: number, handleClick: () => void }) => {
     const { date: selectedDate, setDate } = useSelectDate()
     const { region: selectedRegion, setSelectedRegion } = useSelectRegion()
     const { branch: selectedBranch, setSelectedBranch } = useSelectBranch()
-    const { wok: selectedWok, setSelectedWok } = useSelectWok()
+    const { wok, setSelectedWok } = useSelectWok()
     const { setSelectedSto } = useSelectSto()
     const { data: areas, isLoading } = useQuery({
         queryKey: ['fmc-areas'],
@@ -110,7 +110,7 @@ export const Filters = ({ daysBehind, handleClick, disabled }: { daysBehind: num
         const area = areas.find((a) => a.regional === selectedRegion);
         const branch = area?.branches.find((b) => b.branchNew === selectedBranch);
         const woks = branch?.woks.find(
-            (s) => s.wok === selectedWok
+            (s) => s.wok === wok
         );
         return woks?.stos.map(area => ({ label: area.sto, value: area.sto })) || [];
     };
@@ -150,7 +150,7 @@ export const Filters = ({ daysBehind, handleClick, disabled }: { daysBehind: num
             </div>
             <div className='space-y-2'>
                 <Label>Branch</Label>
-                <Select onValueChange={handleBranchChange} defaultValue="" value={selectedBranch}>
+                <Select onValueChange={handleBranchChange}>
                     <SelectTrigger className='w-full' disabled={!selectedRegion}>
                         <SelectValue placeholder='Select Branch' />
                     </SelectTrigger>
@@ -163,7 +163,7 @@ export const Filters = ({ daysBehind, handleClick, disabled }: { daysBehind: num
             </div>
             <div className='space-y-2'>
                 <Label>WOK</Label>
-                <Select onValueChange={handleWokChange} defaultValue="" value={selectedWok}>
+                <Select onValueChange={handleWokChange}>
                     <SelectTrigger disabled={!selectedBranch} className='w-full'>
                         <SelectValue placeholder='Select WOK' />
                     </SelectTrigger>
@@ -175,9 +175,9 @@ export const Filters = ({ daysBehind, handleClick, disabled }: { daysBehind: num
                 </Select>
             </div>
             <div className="space-y-2 mt-auto">
-                <Button onClick={handleClick} disabled={!selectedBranch || (!selectedBranch && !selectedWok) || disabled} className="cursor-pointer">
+                <Button onClick={handleClick} disabled={!selectedBranch} className="cursor-pointer">
                     <FolderTree />
-                    Clear Filter
+                    Tampilkan data
                 </Button>
             </div>
         </div>

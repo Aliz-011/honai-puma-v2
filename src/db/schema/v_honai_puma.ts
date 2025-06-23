@@ -1,4 +1,4 @@
-import { mysqlSchema, varchar, double, index, decimal, bigint, int } from "drizzle-orm/mysql-core";
+import { mysqlSchema, varchar, double, index, decimal, bigint } from "drizzle-orm/mysql-core";
 
 export const honaiPuma = mysqlSchema('v_honai_puma')
 
@@ -727,19 +727,9 @@ export const targetHouseholdAll = honaiPuma.table('target_household_all', {
 })
 
 export const targetTerritoryDemands = honaiPuma.table('target_territory_demands', {
-    branch: varchar('branch', { length: 30 }),
-    wok: varchar('wok', { length: 20 }),
+    territory: varchar('territory', { length: 20 }),
     periode: varchar('periode', { length: 10 }),
     ytd_demand: varchar('ytd_demand', { length: 20 })
-})
-
-export const targetRevenueC3mr = honaiPuma.table('target_revenue_c3mr', {
-    branch: varchar('branch', { length: 20 }),
-    wok: varchar('wok', { length: 20 }),
-    periode: varchar('periode', { length: 10 }),
-    rev_all: varchar('rev_all', { length: 20 }),
-    rev_ns: varchar('rev_ns', { length: 20 }),
-    rev_existing: varchar('rev_existing', { length: 20 })
 })
 
 export const summaryRevAllRegional = honaiPuma.table('summary_rev_all_regional', {
@@ -3726,88 +3716,3 @@ export const summaryIoRePsSto = honaiPuma.table('summary_hadoop_io_re_ps_sto', {
     ps_to_io: varchar('ps_to_io', { length: 100 }),
     ps_to_re: varchar('ps_to_re', { length: 100 }),
 });
-
-export const summaryHouseholdC3mrRegional = honaiPuma.table('summary_household_c3mr_regional', {
-    event_date: varchar('event_date', { length: 20 }),
-    regional: varchar('regional', { length: 20 }),
-    billing_category: varchar('billing_category', { length: 20 }),
-    los_category: varchar('los_category', { length: 20 }),
-    bill_amount: varchar('bill_amount', { length: 50 }),
-    subs_paid: int('subs_paid'),
-    amount_paid: varchar('amount_paid', { length: 50 }),
-    subs_paid_pctg: double('subs_paid_pctg'),
-    amount_paid_pctg: double('amount_paid_pctg'),
-    amount_unpaid: varchar('amount_unpaid', { length: 50 }),
-    subs_unpaid: int('subs_unpaid'),
-    subs: int('subs'),
-})
-
-export const summaryHouseholdC3mrBranch = honaiPuma.table('summary_household_c3mr_branch', {
-    event_date: varchar('event_date', { length: 20 }),
-    regional: varchar('regional', { length: 20 }),
-    branch: varchar('branch', { length: 30 }),
-    billing_category: varchar('billing_category', { length: 20 }),
-    los_category: varchar('los_category', { length: 20 }),
-    bill_amount: varchar('bill_amount', { length: 50 }),
-    subs_paid: int('subs_paid'),
-    amount_paid: varchar('amount_paid', { length: 50 }),
-    subs_paid_pctg: double('subs_paid_pctg'),
-    amount_paid_pctg: double('amount_paid_pctg'),
-    amount_unpaid: varchar('amount_unpaid', { length: 50 }),
-    subs_unpaid: int('subs_unpaid'),
-    subs: int('subs'),
-})
-
-export const summaryHouseholdC3mrCluster = honaiPuma.table('summary_household_c3mr_cluster', {
-    event_date: varchar('event_date', { length: 20 }),
-    regional: varchar('regional', { length: 20 }),
-    branch: varchar('branch', { length: 30 }),
-    cluster: varchar('cluster', { length: 30 }),
-    billing_category: varchar('billing_category', { length: 20 }),
-    los_category: varchar('los_category', { length: 20 }),
-    bill_amount: varchar('bill_amount', { length: 50 }),
-    subs_paid: int('subs_paid'),
-    amount_paid: varchar('amount_paid', { length: 50 }),
-    subs_paid_pctg: double('subs_paid_pctg'),
-    amount_paid_pctg: double('amount_paid_pctg'),
-    amount_unpaid: varchar('amount_unpaid', { length: 50 }),
-    subs_unpaid: int('subs_unpaid'),
-    subs: int('subs'),
-})
-
-export const summaryHouseholdC3mrCity = honaiPuma.table('summary_household_c3mr_city', {
-    event_date: varchar('event_date', { length: 20 }),
-    regional: varchar('regional', { length: 20 }),
-    branch: varchar('branch', { length: 30 }),
-    cluster: varchar('cluster', { length: 30 }),
-    city: varchar('city', { length: 30 }),
-    billing_category: varchar('billing_category', { length: 20 }),
-    los_category: varchar('los_category', { length: 20 }),
-    bill_amount: varchar('bill_amount', { length: 50 }),
-    subs_paid: int('subs_paid'),
-    amount_paid: varchar('amount_paid', { length: 50 }),
-    subs_paid_pctg: double('subs_paid_pctg'),
-    amount_paid_pctg: double('amount_paid_pctg'),
-    amount_unpaid: varchar('amount_unpaid', { length: 50 }),
-    subs_unpaid: int('subs_unpaid'),
-    subs: int('subs'),
-})
-
-export const summaryHouseholdC3mrSto = honaiPuma.table('summary_household_c3mr_sto', {
-    event_date: varchar('event_date', { length: 20 }),
-    regional: varchar('regional', { length: 20 }),
-    branch: varchar('branch', { length: 30 }),
-    cluster: varchar('cluster', { length: 30 }),
-    city: varchar('city', { length: 30 }),
-    sto: varchar('sto', { length: 5 }),
-    billing_category: varchar('billing_category', { length: 20 }),
-    los_category: varchar('los_category', { length: 20 }),
-    bill_amount: varchar('bill_amount', { length: 50 }),
-    subs_paid: int('subs_paid'),
-    amount_paid: int('amount_paid'),
-    subs_paid_pctg: double('subs_paid_pctg'),
-    amount_paid_pctg: double('amount_paid_pctg'),
-    amount_unpaid: int('amount_unpaid'),
-    subs_unpaid: int('subs_unpaid'),
-    subs: int('subs'),
-})

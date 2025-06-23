@@ -12,7 +12,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
 
 import { useSelectDate } from '@/hooks/use-select-date'
 import { useSelectRegion } from '@/hooks/use-select-region';
@@ -183,7 +182,7 @@ export const Filters = ({ daysBehind }: { daysBehind: number }) => {
             </div>
             <div className='space-y-2'>
                 <Label>Branch</Label>
-                <Select onValueChange={handleBranchChange} defaultValue="" value={selectedBranch}>
+                <Select onValueChange={handleBranchChange}>
                     <SelectTrigger className='w-full' disabled={!selectedRegion}>
                         <SelectValue placeholder='Select Branch' />
                     </SelectTrigger>
@@ -196,7 +195,7 @@ export const Filters = ({ daysBehind }: { daysBehind: number }) => {
             </div>
             <div className='space-y-2'>
                 <Label>Subbranch</Label>
-                <Select onValueChange={handleSubbranchChange} defaultValue="" value={selectedSubbranch}>
+                <Select onValueChange={handleSubbranchChange}>
                     <SelectTrigger disabled={!selectedBranch} className='w-full'>
                         <SelectValue placeholder='Select Subbranch' />
                     </SelectTrigger>
@@ -209,7 +208,7 @@ export const Filters = ({ daysBehind }: { daysBehind: number }) => {
             </div>
             <div className='space-y-2'>
                 <Label>Cluster</Label>
-                <Select onValueChange={handleClusterChange} defaultValue="" value={selectedCluster}>
+                <Select onValueChange={handleClusterChange}>
                     <SelectTrigger disabled={!selectedSubbranch} className='w-full'>
                         <SelectValue placeholder='Select Cluster' />
                     </SelectTrigger>
@@ -232,15 +231,6 @@ export const Filters = ({ daysBehind }: { daysBehind: number }) => {
                         ))}
                     </SelectContent>
                 </Select>
-            </div>
-            <div className="space-y-2 mt-auto">
-                <Button onClick={() => {
-                    setSelectedBranch('')
-                    setSelectedSubbranch('')
-                    setSelectedCluster('')
-                }} disabled={!selectedBranch || (!selectedBranch && !selectedSubbranch && !selectedCluster)} className="cursor-pointer">
-                    Clear Filter
-                </Button>
             </div>
         </div>
     )

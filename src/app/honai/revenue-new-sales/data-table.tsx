@@ -1,6 +1,6 @@
 import React from "react"
 import type { QueryObserverResult, RefetchOptions } from "@tanstack/react-query"
-import { endOfMonth, format, intlFormat, subDays } from "date-fns"
+import { endOfMonth, intlFormat, subDays } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -15,8 +15,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from "@/components/ui/skeleton"
 
-import { cn, exportToExcel, formatToBillion, getAchGrowthColor, getGrowthColor } from "@/lib/utils"
-import { Download } from "lucide-react"
+import { cn, formatToBillion, getAchGrowthColor, getGrowthColor } from "@/lib/utils"
 
 type Params = {
     data?: Revenue[];
@@ -56,31 +55,10 @@ export function DataTable({ latestUpdatedData: daysBehind, refetch, title, data,
         )
     }
 
-    const formattedData = data.map(item => ({
-        territory: item.name,
-        target: item.target_rev_ns,
-        rev: item.rev_ns,
-        gap: item.gap_to_target_ns,
-        achFm: item.ach_target_fm_ns,
-        drr: item.drr_ns,
-        mom: item.mom_ns,
-        abs: item.rev_ns_absolut,
-        yoy: item.yoy_ns,
-        ytd: item.ytd_ns,
-        qoq: item.qoq_ns
-    }))
-
-    const handleDownload = async () => {
-        exportToExcel(formattedData, format(selectedDate, 'd MMM'), `revenue_new_sales_${format(selectedDate, 'yyyyMM')}`)
-    }
-
     return (
         <Card>
-            <CardHeader className="flex items-center justify-between">
+            <CardHeader>
                 <CardTitle>{title}</CardTitle>
-                <Button variant='outline' size='sm' className="cursor-pointer" onClick={handleDownload}>
-                    <Download className="size-4" />
-                </Button>
             </CardHeader>
             <CardContent>
                 <Table>

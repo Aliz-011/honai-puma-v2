@@ -22,7 +22,6 @@
 html,
 body {
   @apply bg-white dark:bg-gray-950;
-  font-family: var(--font-dm-sans), sans-serif;
 
   @media (prefers-color-scheme: dark) {
     color-scheme: dark;

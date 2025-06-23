@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { DM_Sans, Lora, IBM_Plex_Mono } from "next/font/google";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import "./globals.css";
@@ -8,27 +8,15 @@ import { QueryProvider } from "@/components/query-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 
-const dmSans = localFont({
-  src: [
-    { path: './fonts/DM_Sans/static/DMSans-Thin.ttf', weight: '200', style: 'normal' },
-    { path: './fonts/DM_Sans/static/DMSans-Light.ttf', weight: '300', style: 'normal' },
-    { path: './fonts/DM_Sans/static/DMSans-Regular.ttf', weight: '400', style: 'normal' },
-    { path: './fonts/DM_Sans/static/DMSans-Medium.ttf', weight: '500', style: 'normal' },
-    { path: './fonts/DM_Sans/static/DMSans-SemiBold.ttf', weight: '600', style: 'normal' },
-    { path: './fonts/DM_Sans/static/DMSans-Bold.ttf', weight: '700', style: 'normal' },
-  ],
+const dmSans = DM_Sans({
   variable: "--font-dm-sans",
+  subsets: ["latin"],
 });
 
-const ibmPlexMono = localFont({
-  src: [
-    { path: '/fonts/IBM_Plex_Mono/IBMPlexMono-Light.ttf', weight: '300', style: 'normal' },
-    { path: '/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf', weight: '400', style: 'normal' },
-    { path: '/fonts/IBM_Plex_Mono/IBMPlexMono-Medium.ttf', weight: '500', style: 'normal' },
-    { path: '/fonts/IBM_Plex_Mono/IBMPlexMono-SemiBold.ttf', weight: '600', style: 'normal' },
-    { path: '/fonts/IBM_Plex_Mono/IBMPlexMono-Bold.ttf', weight: '700', style: 'normal' },
-  ],
+const ibmPlexMono = IBM_Plex_Mono({
+  weight: ['400', '500', '600'],
   variable: "--font-ibm-plex-mono",
+  subsets: ['latin']
 })
 
 export const metadata: Metadata = {
@@ -44,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${dmSans.variable} ${ibmPlexMono.variable} antialiased`}
+        className={`${dmSans.className} ${ibmPlexMono.className} antialiased`}
       >
         <QueryProvider>
           <ThemeProvider

@@ -92,6 +92,16 @@ export function DataTable({ latestUpdatedData: daysBehind, refetch, title, data,
                             <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">
                                 Abs
                             </TableHead>
+                            <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">
+                                <div className="flex items-center justify-center">
+                                    YoY
+                                </div>
+                            </TableHead>
+                            <TableHead className="whitespace-nowrap font-medium text-white bg-zinc-950 border-r last:border-r-0 dark:border-r-gray-700 text-center">
+                                <div className="flex items-center justify-center">
+                                    YtD
+                                </div>
+                            </TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -138,6 +148,12 @@ export function DataTable({ latestUpdatedData: daysBehind, refetch, title, data,
                                             </TableCell>
                                             <TableCell className={cn("px-1 py-0.5 border-r last:border-r-0 text-end dark:text-white dark:border-gray-800 !tabular-nums", item.so_absolut > 0 ? 'text-green-500' : 'text-rose-500')}>
                                                 <span className='text-end'>{formatToBillion(item.so_absolut)}</span>
+                                            </TableCell>
+                                            <TableCell className={cn("px-1 py-0.5 border-r last:border-r-0 text-end text-theme-xs dark:text-white dark:border-gray-800 !tabular-nums", getGrowthColor(item.yoy_so) ? 'text-green-500' : 'text-rose-500')}>
+                                                {item.yoy_so}
+                                            </TableCell>
+                                            <TableCell className={cn("px-1 py-0.5 border-r last:border-r-0 text-end text-theme-xs dark:text-white dark:border-gray-800 !tabular-nums", getGrowthColor(item.ytd_so) ? 'text-green-500' : 'text-rose-500')}>
+                                                {item.ytd_so}
                                             </TableCell>
                                         </>
                                     )}

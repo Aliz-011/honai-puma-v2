@@ -109,7 +109,7 @@ export const dynamicIhOrderingDetailOrderTable = (year: string, month: string) =
         c_errorcode: varchar('c_errorcode', { length: 255 }),
         c_suberrorcode: varchar('c_suberrorcode', { length: 255 }),
         c_engineermemo: varchar('c_engineermemo', { length: 255 }),
-        c_urlevidence: varchar('c_urlevidence', { length: 255 }),
+        c_irlevidence: varchar('c_irlevidence', { length: 255 }),
         c_amcrew: varchar('c_amcrew', { length: 255 }),
         c_chief_code: varchar('c_chief_code', { length: 255 }),
         c_chief_name: varchar('c_chief_name', { length: 255 }),
@@ -181,44 +181,6 @@ export const dynamicIhAvailOdpA4 = (year: string, month: string) => {
         load_user: varchar('load_user', { length: 200 }),
         load_ts: varchar('load_ts', { length: 200 }),
         event_date: varchar('event_date', { length: 20 }),
-    })
-}
-
-export const dynamicIhC3mr = (year: string, month: string) => {
-    return household.table(`ih_c3mr_detail_dd_${year}${month}`, {
-        nper: varchar('nper', { length: 10 }),
-        bb_id: varchar('bb_id', { length: 30 }),
-        telp_number: varchar('telp_number', { length: 20 }),
-        account_num: varchar('account_num', { length: 20 }),
-        name: varchar('name', { length: 50 }),
-        address: varchar('address', { length: 70 }),
-        email: varchar('email', { length: 100 }),
-        no_hp: varchar('no_hp', { length: 20 }),
-        area: varchar('area', { length: 20 }),
-        region: varchar('region', { length: 20 }),
-        branch: varchar('branch', { length: 20 }),
-        cluster: varchar('cluster', { length: 30 }),
-        city: varchar('city', { length: 30 }),
-        sto: varchar('sto', { length: 5 }),
-        los_category: varchar('los_category', { length: 15 }),
-        usage: varchar('usage', { length: 20 }),
-        product_type: varchar('product_type', { length: 20 }),
-        customer_category: varchar('customer_category', { length: 20 }),
-        customer_segment: varchar('customer_segment', { length: 20 }),
-        exception: varchar('exception', { length: 100 }),
-        outstanding: varchar('outstanding', { length: 50 }),
-        service_type: varchar('service_type', { length: 50 }),
-        billing_category: varchar('billing_category', { length: 15 }),
-        speed_category: varchar('speed_category', { length: 10 }),
-        bill_amount: varchar('bill_amount', { length: 50 }),
-        paid_flag: varchar('paid_flag', { length: 5 }),
-        payment_date: varchar('payment_date', { length: 20 }),
-        payment_amount: varchar('payment_amount', { length: 50 }),
-        cash_amount: varchar('cash_amount', { length: 50 }),
-        claim_amount: varchar('claim_amount', { length: 50 }),
-        event_date: varchar('event_date', { length: 20 }),
-        load_date: varchar('load_date', { length: 20 }),
-        source: varchar('source', { length: 20 }),
     })
 }
 

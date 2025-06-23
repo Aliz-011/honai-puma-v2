@@ -7,15 +7,15 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card"
-import { type ResponseData } from "./page"
+import { type ChartDataItem } from "./chart-component"
 
-export const SectionCards = ({ data }: { data: ResponseData[] }) => {
+export const SectionCards = ({ data }: { data: ChartDataItem[] }) => {
     return (
         <div className="*:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4 grid grid-cols-1 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card">
             {data.map((item, index) => (
                 <Card className="@container/card" key={index}>
                     <CardHeader className="relative">
-                        <CardTitle>Ratio Fulfilment: {item.name}</CardTitle>
+                        <CardTitle>Ratio Fulfilment</CardTitle>
 
                     </CardHeader>
                     <CardContent className="flex flex-col">
@@ -32,12 +32,17 @@ export const SectionCards = ({ data }: { data: ResponseData[] }) => {
                             <div className="text-sm font-medium">{item.ps_to_re}</div>
                         </div>
                     </CardContent>
+                    <CardFooter className="flex-col items-start gap-1 text-sm">
+                        <div className="line-clamp-1 flex gap-2 font-medium">
+                            {item.name}
+                        </div>
+                    </CardFooter>
                 </Card>
             ))}
             {data.map((item, index) => (
                 <Card className="@container/card" key={index}>
                     <CardHeader className="relative">
-                        <CardTitle>Daily PS: {item.name}</CardTitle>
+                        <CardTitle>Daily PS</CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-col">
                         <div className="flex items-center justify-between">
@@ -53,6 +58,11 @@ export const SectionCards = ({ data }: { data: ResponseData[] }) => {
                             <div className="text-sm font-medium">{item.daily_ps_remaining}</div>
                         </div>
                     </CardContent>
+                    <CardFooter className="flex-col items-start gap-1 text-sm">
+                        <div className="line-clamp-1 flex gap-2 font-medium">
+                            {item.name}
+                        </div>
+                    </CardFooter>
                 </Card>
             ))}
         </div>
