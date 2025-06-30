@@ -1,29 +1,19 @@
-import { endOfMonth, format, startOfMonth } from "date-fns";
+import { Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 type ProgressCardParams = {
-    date: Date;
     data: {
         label: string;
         total_port: number;
         used_port: number;
         ach: string;
-        style?: string;
+        className?: string;
     }[];
     title: string;
 }
 
-export const ProgressCard = ({ date, data, title }: ProgressCardParams) => {
-    const selectedDate = new Date(date)
-    const lastDayOfSelectedMonth = endOfMonth(selectedDate);
-    const isEndOfMonth = selectedDate.getDate() === lastDayOfSelectedMonth.getDate();
-
-    const endOfCurrMonth = isEndOfMonth ? lastDayOfSelectedMonth : selectedDate;
-
-    const currStartOfMonth = format(startOfMonth(selectedDate), 'd')
-    const currDate = format(endOfCurrMonth, 'dd MMM yyyy')
-
+export const ProgressCard = ({ data, title }: ProgressCardParams) => {
     return (
         <div className="bg-white dark:bg-white/[0.03] rounded-lg shadow-md overflow-hidden w-full h-fit">
             <div className="bg-red-700 text-white p-3">
@@ -34,18 +24,18 @@ export const ProgressCard = ({ date, data, title }: ProgressCardParams) => {
                     <thead className="bg-red-100">
                         <tr>
                             <th className="px-3 py-2 text-left font-semibold">Golive</th>
-                            <th className="px-3 py-2 text-right font-semibold">Total Port</th>
-                            <th className="px-3 py-2 text-right font-semibold">Used Port</th>
-                            <th className="px-3 py-2 text-right font-semibold">%Occ</th>
+                            <th className="px-3 py-2 text-start font-semibold">Total</th>
+                            <th className="px-3 py-2 text-start font-semibold">Used</th>
+                            <th className="px-3 py-2 text-start font-semibold">%Occ</th>
                         </tr>
                     </thead>
                     <tbody>
                         {data.map((item, index) => (
                             <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                                 <td className="px-3 py-2 font-normal">{item.label}</td>
-                                <td className="px-3 py-2 text-right font-bold">{item.total_port}</td>
-                                <td className="px-3 py-2 text-right font-bold">{item.used_port}</td>
-                                <td className="px-3 py-2 text-right">
+                                <td className="px-3 py-2 text-start font-bold">{Number(item.total_port).toLocaleString('id-ID')}</td>
+                                <td className="px-3 py-2 text-start font-bold">{Number(item.used_port).toLocaleString('id-ID')}</td>
+                                <td className="px-3 py-2 text-start">
                                     <span className={`px-2 py-1 font-normal`}>
                                         {item.ach}
                                     </span>
@@ -63,21 +53,21 @@ export const GoliveCard = ({ data, title }: {
     data: {
         label: string;
         value: number | string;
+        className?: string;
     }[];
     title: string;
 }) => {
     return (
-        <div className="bg-white/95 backdrop-blur-lg rounded-lg p-6 border border-white/20 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-600"></div>
-            <div className="flex items-center gap-3 mb-6">
+        <div className="bg-white/95 backdrop-blur-lg rounded-lg p-4 border relative overflow-hidden">
+            <div className="flex items-center gap-3 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-2">
                 {data.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center border-b border-gray-100 last:border-b-0">
-                        <span className="text-gray-600 font-medium text-sm">{item.label}</span>
-                        <span className={cn("px-2 py-1.5 rounded-lg font-bold text-sm")}>
+                    <div key={index} className="flex justify-between px-2 items-center bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-xl hover:shadow-md transition-all duration-200">
+                        <span className="text-gray-600 font-medium text-base">{item.label}</span>
+                        <span className={cn("px-2 py-1.5 rounded-lg font-bold text-base", item.className)}>
                             {item.value}
                         </span>
                     </div>
@@ -89,19 +79,17 @@ export const GoliveCard = ({ data, title }: {
 
 export const DemandData = ({ data }: { data: { metric: string, value: number | string }[] }) => {
     return (
-        <div className="bg-white rounded-xl p-6">
-            <div className="flex items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Demand Analysis</h2>
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6 hover:shadow-2xl transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-800 flex items-center">
+                    <div className="w-1 h-8 bg-gradient-to-b from-orange-400 to-orange-600 rounded-full mr-3"></div>
+                    Demand Analysis
+                </h2>
+                <Search className="w-5 h-5 text-orange-500" />
             </div>
 
             <div className="overflow-x-auto">
                 <table className="w-full">
-                    <thead>
-                        <tr className="border-b border-gray-200">
-                            <th className="text-left p-3 text-sm font-semibold text-gray-600 uppercase tracking-wider">Metric</th>
-                            <th className="text-left p-3 text-sm font-semibold text-gray-600 uppercase tracking-wider">Value</th>
-                        </tr>
-                    </thead>
                     <tbody>
                         {data.map((row, index) => (
                             <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors last:border-none">

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import DatePicker from 'react-datepicker'
+import { Funnel } from 'lucide-react';
 import { getDaysInMonth, getMonth, getYear, subDays } from 'date-fns'
 
 import "react-datepicker/dist/react-datepicker.css";
@@ -22,8 +23,6 @@ import { useSelectWok } from '@/hooks/use-select-wok';
 import { useSelectSto } from '@/hooks/use-select-sto';
 import { useSelectDate } from '@/hooks/use-select-date';
 import { client } from '@/lib/client';
-import { Button } from '@/components/ui/button';
-import { FolderTree } from 'lucide-react';
 
 export const Filters = ({ daysBehind, handleClick, disabled = false }: { daysBehind: number, handleClick: () => void, disabled?: boolean }) => {
     const { date: selectedDate, setDate: setSelectedDate } = useSelectDate()
@@ -191,10 +190,10 @@ export const Filters = ({ daysBehind, handleClick, disabled = false }: { daysBeh
                 </Select>
             </div>
             <div className="space-y-2 mt-auto">
-                <Button onClick={handleClick} disabled={!selectedBranch || (!selectedBranch && !wok) || disabled} className="cursor-pointer">
-                    <FolderTree />
+                <button onClick={handleClick} disabled={!selectedBranch || (!selectedBranch && !wok) || disabled} className="cursor-pointer px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-xs font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl disabled:pointer-events-none disabled:opacity-50">
+                    <Funnel className="w-3 h-3 inline mr-1" />
                     Clear Filter
-                </Button>
+                </button>
             </div>
         </div>
     )

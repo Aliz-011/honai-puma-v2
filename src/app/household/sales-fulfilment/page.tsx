@@ -1,12 +1,11 @@
 'use client'
 
 import { useQuery } from "@tanstack/react-query"
-import { useState, useMemo } from "react"
+import { useState, useMemo, Fragment } from "react"
 import { format, subDays } from "date-fns"
-import { ChevronRight } from "lucide-react"
 
 import { SectionCards } from "./section-cards"
-import { BrownGreenChart, ChartPie, ProgressCard } from "./chart-component"
+import { ChartPie, ProgressCard } from "./chart-component"
 import { Filters } from "./filter"
 import { FunnelingGroup, WOLoS } from "./funneling-group"
 import { SalesForce } from './sales-force'
@@ -84,12 +83,6 @@ const Page = () => {
     })
 
     const handleClick = () => {
-        // refetch()
-        // refetchSf()
-        // if (!fetchDataClicked) {
-        //     setFetchDataClicked(true);
-        // }
-
         setSelectedBranch('')
         setSelectedWok('')
     };
@@ -123,7 +116,7 @@ const Page = () => {
             target: item.target_all_sales,
             actual: item.io_m,
             drr: item.drr_io,
-            color: 'text-chart-5',
+            color: 'bg-chart-1 text-chart-1',
             ach_fm: (item.io_m / item.target_all_sales * 100).toFixed(2) + '%'
         }))
 
@@ -132,7 +125,7 @@ const Page = () => {
             target: item.target_all_sales,
             actual: item.re_m,
             drr: item.drr_re,
-            color: 'text-chart-2',
+            color: 'bg-chart-2 text-chart-2',
             ach_fm: (item.re_m / item.target_all_sales * 100).toFixed(2) + '%'
         }))
 
@@ -141,30 +134,28 @@ const Page = () => {
             target: item.target_all_sales,
             actual: item.ps_m,
             drr: item.drr_ps,
-            color: 'text-chart-4',
+            color: 'bg-chart-4 text-chart-4',
             ach_fm: (item.ps_m / item.target_all_sales * 100).toFixed(2) + '%'
         }))
 
         return (
-            <section key={level} className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <ProgressCard
-                        date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
-                        title='IO'
-                        data={ioChartData}
-                    />
-                    <ProgressCard
-                        date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
-                        title='RE'
-                        data={reChartData}
-                    />
-                    <ProgressCard
-                        date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
-                        title='PS'
-                        data={psChartData}
-                    />
-                </div>
-            </section>
+            <Fragment key={level}>
+                <ProgressCard
+                    date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
+                    title='IO'
+                    data={ioChartData}
+                />
+                <ProgressCard
+                    date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
+                    title='RE'
+                    data={reChartData}
+                />
+                <ProgressCard
+                    date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
+                    title='PS'
+                    data={psChartData}
+                />
+            </Fragment>
         );
     };
 
@@ -185,7 +176,7 @@ const Page = () => {
             target: item.target_brownfield,
             actual: item.brownfield,
             drr: parseFloat(item.drr_brownfield.replace('%', '')),
-            color: 'text-orange-900',
+            color: 'bg-orange-800 text-orange-800',
             ach_fm: (item.brownfield / item.target_brownfield * 100).toFixed(2) + '%'
         }))
 
@@ -194,26 +185,23 @@ const Page = () => {
             target: item.target_greenfield,
             actual: item.greenfield,
             drr: parseFloat(item.drr_greenfield.replace('%', '')),
-            color: 'text-teal-500',
+            color: 'bg-teal-500 text-teal-500',
             ach_fm: (item.greenfield / item.target_greenfield * 100).toFixed(2) + '%'
         }))
 
         return (
-            <section key={level} className="space-y-6">
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <ProgressCard
-                        date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
-                        title='Brownfield'
-                        data={brownfieldData}
-                    />
-                    <ProgressCard
-                        date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
-                        title='Greenfield'
-                        data={greenfieldData}
-                    />
-                </div>
-            </section>
+            <Fragment key={level}>
+                <ProgressCard
+                    date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
+                    title='Brownfield'
+                    data={brownfieldData}
+                />
+                <ProgressCard
+                    date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
+                    title='Greenfield'
+                    data={greenfieldData}
+                />
+            </Fragment>
         );
     };
 
@@ -222,11 +210,11 @@ const Page = () => {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             {/* Header Section with Filters */}
-            <div className=" px-6 py-4">
+            <div className="px-4 py-4">
                 <Filters daysBehind={2} handleClick={handleClick} disabled={isLoading || isLoadingSf} />
             </div>
 
-            <div className="mx-auto px-4 py-8 space-y-12">
+            <div className="mx-auto px-4 py-8 space-y-10">
                 {(() => {
                     if (isLoading || isLoadingSf) {
                         return (
@@ -274,105 +262,120 @@ const Page = () => {
 
                                 {/* KPI Overview Section */}
                                 <section className="space-y-6">
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Performance Overview</h2>
-                                        <p className="text-gray-600 dark:text-gray-400 mt-1">Key performance indicators and metrics</p>
-                                    </div>
                                     <SectionCards data={data} />
                                 </section>
 
                                 {/* IO-RE-PS Charts Section */}
-                                <section className="space-y-10">
-                                    <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">IO-RE-PS Performance</h2>
-                                        <p className="text-gray-600 dark:text-gray-400 mt-1">Input Order, RE, and Put in Service metrics</p>
+                                <section className="space-y-6">
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">IO-RE-PS & Brownfield Greenfield</h2>
+                                        <p className="text-gray-600 dark:text-gray-400 mt-1">Input Order, RE, and Put in Service • Brownfield & Greenfield expansion</p>
                                     </div>
 
-                                    {Object.keys(groupedData)
-                                        .filter(level => level !== '')
-                                        .map(level => {
-                                            let title = "";
-                                            switch (level) {
-                                                case 'region': title = 'Regional IO-RE-PS'; break;
-                                                case 'branch': title = 'Branch IO-RE-PS'; break;
-                                                case 'wok': title = 'WOK IO-RE-PS'; break;
-                                                case 'sto': title = 'STO IO-RE-PS'; break;
-                                                default: title = `${level} IO-RE-PS`;
-                                            }
-                                            return renderChartsForIOREPS(level, title);
-                                        })}
-                                </section>
-
-                                {/* Brownfield & Greenfield Section */}
-                                <section className="space-y-10">
-                                    <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Brownfield & Greenfield</h2>
-                                        <p className="text-gray-600 dark:text-gray-400 mt-1">Territory development and expansion metrics</p>
+                                    <div className="grid grid-cols-5 gap-4">
+                                        <div className="col-span-3 text-center">
+                                            <h2 className="text-lg font-semibold text-gray-800 border-b-2 border-blue-500 pb-1">
+                                                IO-RE-PS
+                                            </h2>
+                                        </div>
+                                        <div className="col-span-2 text-center">
+                                            <h2 className="text-lg font-semibold text-gray-800 border-b-2 border-green-500 pb-1">
+                                                Brownfield Greenfield
+                                            </h2>
+                                        </div>
                                     </div>
 
-                                    {Object.keys(groupedData)
-                                        .filter(level => level !== '')
-                                        .map(level => {
-                                            let title = "";
-                                            switch (level) {
-                                                case 'region': title = 'Regional Territory'; break;
-                                                case 'branch': title = 'Branch Territory'; break;
-                                                case 'wok': title = 'WOK Territory'; break;
-                                                case 'sto': title = 'STO Territory'; break;
-                                                default: title = `${level} Territory`;
-                                            }
-                                            return renderChartsForBrownGreen(level, title);
-                                        })}
+                                    <div className="flex-1 grid grid-cols-5 gap-4">
+                                        {Object.keys(groupedData)
+                                            .filter(level => level !== '')
+                                            .map(level => {
+                                                let title = "";
+                                                switch (level) {
+                                                    case 'region': title = 'Regional IO-RE-PS'; break;
+                                                    case 'branch': title = 'Branch IO-RE-PS'; break;
+                                                    case 'wok': title = 'WOK IO-RE-PS'; break;
+                                                    case 'sto': title = 'STO IO-RE-PS'; break;
+                                                    default: title = `${level} IO-RE-PS`;
+                                                }
+                                                return renderChartsForIOREPS(level, title);
+                                            })}
+
+                                        {Object.keys(groupedData)
+                                            .filter(level => level !== '')
+                                            .map(level => {
+                                                let title = "";
+                                                switch (level) {
+                                                    case 'region': title = 'Regional Territory'; break;
+                                                    case 'branch': title = 'Branch Territory'; break;
+                                                    case 'wok': title = 'WOK Territory'; break;
+                                                    case 'sto': title = 'STO Territory'; break;
+                                                    default: title = `${level} Territory`;
+                                                }
+                                                return renderChartsForBrownGreen(level, title);
+                                            })}
+                                    </div>
                                 </section>
 
-                                {/* Analytics & Data Section - Improved bottom layout */}
+                                {/* Analytics & Data Section */}
                                 <section className="space-y-6">
                                     <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">PS by Channel & SF</h2>
-                                        <p className="text-gray-600 dark:text-gray-400 mt-1">Detailed PS by Channel and Sales Force</p>
+                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">PS by Channel & SF • Funneling Group & WO by LoS</h2>
+                                        <p className="text-gray-600 dark:text-gray-400 mt-1">Detailed PS by Channel and Sales Force • Funneling workflow analysis</p>
                                     </div>
 
-                                    {/* First Row: Pie Chart and Table */}
-                                    <div className="grid grid-cols-2 gap-8">
-                                        <div>
-                                            <ChartPie
-                                                date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
-                                                data={data}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <SalesForce data={sfData} selectedDate={selectedDate ?? subDays(new Date(), 2)} />
-                                        </div>
-                                    </div>
-                                </section>
-
-                                {/* Funneling Group & WO by LoS */}
-                                <section className="space-y-6">
-                                    <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Funneling Group & WO by LoS</h2>
-                                    </div>
-
-                                    {/* Second Row: Funneling Group */}
-                                    <div className="grid grid-cols-1 xl:grid-cols-11 gap-4 items-start">
-                                        <div className="col-span-5">
-                                            <FunnelingGroup
-                                                data={data}
-                                                selectedDate={selectedDate ?? subDays(new Date(), 2)}
-                                            />
-                                        </div>
-
-                                        <div className="col-span-1 self-center mx-auto">
-                                            <div className="flex items-center justify-center p-2 rounded-full size-10 bg-muted">
-                                                <ChevronRight className="size-8 text-neutral-500 font-bold" />
+                                    <div className="h-full grid grid-cols-4 gap-6">
+                                        <div className="flex flex-col">
+                                            <div className="text-center mb-4">
+                                                <h3 className="text-lg font-semibold text-gray-800 border-b-2 border-blue-500 pb-1">
+                                                    PS By Channel
+                                                </h3>
+                                            </div>
+                                            <div className="flex-1 w-full">
+                                                <ChartPie
+                                                    date={format(selectedDate ? selectedDate : subDays(new Date(), 2), 'dd MMM yyyy')}
+                                                    data={data}
+                                                />
                                             </div>
                                         </div>
 
-                                        <div className="col-span-5">
-                                            <WOLoS
-                                                data={data}
-                                                selectedDate={selectedDate ?? subDays(new Date(), 2)}
-                                            />
+                                        <div className="flex flex-col">
+                                            <div className="text-center mb-4">
+                                                <h3 className="text-lg font-semibold text-gray-800 border-b-2 border-orange-500 pb-1">
+                                                    Sales Force
+                                                </h3>
+                                            </div>
+                                            <div className="flex-1">
+                                                <SalesForce data={sfData} selectedDate={selectedDate ?? subDays(new Date(), 2)} />
+                                            </div>
+                                        </div>
+
+
+                                        <div className="flex flex-col">
+                                            <div className="text-center mb-4">
+                                                <h3 className="text-lg font-semibold text-gray-800 border-b-2 border-green-500 pb-1">
+                                                    Funneling Group
+                                                </h3>
+                                            </div>
+                                            <div className="flex-1">
+                                                <FunnelingGroup
+                                                    data={data}
+                                                    selectedDate={selectedDate ?? subDays(new Date(), 2)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col">
+                                            <div className="text-center mb-4">
+                                                <h3 className="text-lg font-semibold text-gray-800 border-b-2 border-purple-500 pb-1">
+                                                    WO Follow Up
+                                                </h3>
+                                            </div>
+                                            <div className="flex-1">
+                                                <WOLoS
+                                                    data={data}
+                                                    selectedDate={selectedDate ?? subDays(new Date(), 2)}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 </section>
@@ -404,8 +407,8 @@ const Page = () => {
 
                     return null;
                 })()}
-            </div>
-        </div>
+            </div >
+        </div >
     )
 }
 

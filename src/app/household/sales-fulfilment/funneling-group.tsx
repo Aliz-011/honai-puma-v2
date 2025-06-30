@@ -99,7 +99,7 @@ export const FunnelingGroup = ({ data, selectedDate }: { data: SalesFulfilmentRe
     return (
         <Card className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <CardHeader>
-                <CardTitle className="text-xl font-semibold">Funneling Group</CardTitle>
+                <CardTitle className="text-base font-semibold">Funneling Group</CardTitle>
                 <CardDescription>{prevMonth} - {currDate}</CardDescription>
             </CardHeader>
 
@@ -109,7 +109,7 @@ export const FunnelingGroup = ({ data, selectedDate }: { data: SalesFulfilmentRe
                     <div className="space-y-3">
                         {/* Registration */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">Registration</div>
+                            <div className="w-28 text-sm font-normal">Registration</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-chart-1/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div
@@ -127,7 +127,7 @@ export const FunnelingGroup = ({ data, selectedDate }: { data: SalesFulfilmentRe
 
                         {/* Provision Issued */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">Provision Issued</div>
+                            <div className="w-28 text-sm font-normal">Provision Issued</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-chart-2/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div
@@ -145,7 +145,7 @@ export const FunnelingGroup = ({ data, selectedDate }: { data: SalesFulfilmentRe
 
                         {/* Provision Completed */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">Provision Completed</div>
+                            <div className="w-28 text-sm font-normal">Provision Completed</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-chart-3/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div
@@ -163,7 +163,7 @@ export const FunnelingGroup = ({ data, selectedDate }: { data: SalesFulfilmentRe
 
                         {/* Activation Completed */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">Activation Completed</div>
+                            <div className="w-28 text-sm font-normal">Activation Completed</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-chart-4/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div
@@ -181,7 +181,7 @@ export const FunnelingGroup = ({ data, selectedDate }: { data: SalesFulfilmentRe
 
                         {/* Cancelled */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">Cancelled</div>
+                            <div className="w-28 text-sm font-normal">Cancelled</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-chart-5/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div
@@ -199,7 +199,7 @@ export const FunnelingGroup = ({ data, selectedDate }: { data: SalesFulfilmentRe
 
                         {/* Fallout */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">Fallout</div>
+                            <div className="w-28 text-sm font-normal">Fallout</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-rose-700/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div
@@ -245,7 +245,7 @@ export const WOLoS = ({ data, selectedDate }: { data: SalesFulfilmentResponseDat
     return (
         <Card className="w-full rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <CardHeader>
-                <CardTitle className="text-xl font-semibold">WO NEED TO FOLLOW UP (By LoS WO)</CardTitle>
+                <CardTitle className="text-base font-semibold">WO need to follow up (By LoS WO)</CardTitle>
                 <CardDescription>{prevMonth} - {currDate}</CardDescription>
             </CardHeader>
 
@@ -255,7 +255,7 @@ export const WOLoS = ({ data, selectedDate }: { data: SalesFulfilmentResponseDat
                     <div className="space-y-3">
                         {/* Registration */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">3 Days</div>
+                            <div className="w-28 text-sm font-normal">3 Days</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-chart-1/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div
@@ -273,7 +273,7 @@ export const WOLoS = ({ data, selectedDate }: { data: SalesFulfilmentResponseDat
 
                         {/* Provision Issued */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">4 - 7 Days</div>
+                            <div className="w-28 text-sm font-normal">4 - 7 Days</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-chart-2/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div
@@ -291,7 +291,7 @@ export const WOLoS = ({ data, selectedDate }: { data: SalesFulfilmentResponseDat
 
                         {/* Provision Completed */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">8 - 14 Days</div>
+                            <div className="w-28 text-sm font-normal">8 - 14 Days</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-chart-3/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div
@@ -309,7 +309,7 @@ export const WOLoS = ({ data, selectedDate }: { data: SalesFulfilmentResponseDat
 
                         {/* Activation Completed */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">15 - 30 Days</div>
+                            <div className="w-28 text-sm font-normal">15 - 30 Days</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-chart-4/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div
@@ -327,7 +327,7 @@ export const WOLoS = ({ data, selectedDate }: { data: SalesFulfilmentResponseDat
 
                         {/* Cancelled */}
                         <div className="flex items-center">
-                            <div className="w-32 text-sm font-normal">{'>'}30 Days</div>
+                            <div className="w-28 text-sm font-normal">{'>'}30 Days</div>
                             <div className="flex-1 mx-4 relative">
                                 <div className="bg-chart-5/20 h-8 rounded-lg flex items-center justify-center relative overflow-hidden">
                                     <div

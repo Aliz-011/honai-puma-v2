@@ -1,6 +1,5 @@
 'use client'
 
-import { format, subDays } from "date-fns"
 import { useQuery } from "@tanstack/react-query"
 
 import { Filters } from "./filter"
@@ -17,7 +16,7 @@ const Page = () => {
     const { branch, setSelectedBranch } = useSelectBranch()
     const { wok, setSelectedWok } = useSelectWok()
 
-    const { data, isLoading, isError, error, refetch, isSuccess } = useQuery({
+    const { data, isLoading, isError, error, isSuccess } = useQuery({
         queryKey: ['demands-deployment', selectedDate, branch, wok],
         queryFn: async ({ queryKey }) => {
 
@@ -48,11 +47,6 @@ const Page = () => {
     })
 
     const handleClick = () => {
-        // refetch()
-        // if (!fetchDataClicked) {
-        //     setFetchDataClicked(true);
-        // }
-
         setSelectedBranch('')
         setSelectedWok('')
     };
@@ -86,45 +80,56 @@ const Page = () => {
 
                 if (isDataActuallyAvailable) {
                     return (
-                        <div className="space-y-12">
+                        <div className="space-y-6">
                             {isError && (
                                 <div className="flex h-full items-center justify-center text-red-500">
                                     <p>Warning: Failed to update data. Displaying last available data. Error: {error?.message}</p>
                                 </div>
                             )}
 
-                            <section className="space-y-6">
-                                <DataTable data={data} />
-                            </section>
+                            <div className="grid grid-cols-12 gap-6">
+                                <section className="space-y-6 col-span-8">
+                                    <DataTable data={data} />
 
-                            <section className="space-y-6">
-                                <DataTableODP data={data} />
-                            </section>
+                                    <DataTableODP data={data} />
+                                </section>
 
 
-                            <section className="space-y-6">
-                                <div className="flex items-center">
-                                    <div className="w-1 h-6 bg-gradient-to-b from-orange-600 to-amber-600 rounded-full mr-3"></div>
-                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">New Golive (UIM) - Port</h2>
+                                <section className="space-y-6 col-span-4">
+                                    <DemandData
+                                        data={[
+                                            { metric: 'YTD DEMANDS', value: data[0].target_ytd_demand.toLocaleString('id-ID') },
+                                            { metric: 'CREATED', value: data[0].demand_created_mtd.toLocaleString('id-ID') },
+                                            { metric: 'MoM', value: data[0].demand_created_mom },
+                                            { metric: 'Achieved', value: data[0].ach_demands },
+                                        ]}
+                                    />
+                                </section>
+                            </div>
+
+                            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow border border-white/20 p-6 hover:shadow-2xl transition-all duration-300">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-xl font-bold text-gray-800 flex items-center">
+                                        <div className="w-1 h-8 bg-gradient-to-b from-orange-400 to-orange-600 rounded-full mr-3"></div>
+                                        New Golive (UIM) - Port
+                                    </h2>
                                 </div>
 
-                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8">
-                                    {/* NEW GOLIVE */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
                                     <GoliveCard
                                         title="New Golive"
                                         data={[
-                                            { label: 'MTD', value: data[0].golive_m },
+                                            { label: 'MTD', value: data[0].golive_m.toLocaleString('id-ID') },
                                             { label: 'M-1', value: data[0].golive_m1 },
-                                            { label: 'MoM', value: data[0].golive_mom },
-                                            { label: 'YTD', value: data[0].golive_y },
-                                            { label: 'Y-1', value: data[0].golive_y1 },
-                                            { label: 'YoY', value: data[0].golive_yoy },
+                                            { label: 'MoM', value: data[0].golive_mom, className: getValueStyle(data[0].golive_mom) },
+                                            { label: 'YTD', value: data[0].golive_y.toLocaleString('id-ID') },
+                                            { label: 'Y-1', value: data[0].golive_y1.toLocaleString('id-ID') },
+                                            { label: 'YoY', value: data[0].golive_yoy, className: getValueStyle(data[0].golive_yoy) },
                                         ]}
                                     />
 
                                     <ProgressCard
                                         title="Go Live 2024"
-                                        date={selectedDate ?? subDays(new Date(), 2)}
                                         data={[
                                             { label: '1mo GL', total_port: data[0].amount_port_1mo_y1, used_port: data[0].used_1mo_y1, ach: data[0].occ_1mo_y1 },
                                             { label: '2mo GL', total_port: data[0].amount_port_2mo_y1, used_port: data[0].used_2mo_y1, ach: data[0].occ_2mo_y1 },
@@ -137,7 +142,6 @@ const Page = () => {
 
                                     <ProgressCard
                                         title="Go Live 2025"
-                                        date={selectedDate ?? subDays(new Date(), 2)}
                                         data={[
                                             { label: '1mo GL', total_port: data[0].amount_port_1mo_y, used_port: data[0].used_1mo_y, ach: data[0].occ_1mo_y },
                                             { label: '2mo GL', total_port: data[0].amount_port_2mo_y, used_port: data[0].used_2mo_y, ach: data[0].occ_2mo_y },
@@ -150,7 +154,6 @@ const Page = () => {
 
                                     <ProgressCard
                                         title="Go Live 2024-2025"
-                                        date={selectedDate ?? subDays(new Date(), 2)}
                                         data={[
                                             { label: '1mo GL', total_port: Number(data[0].amount_port_1mo_y) + Number(data[0].amount_port_1mo_y1), used_port: Number(data[0].used_1mo_y) + Number(data[0].used_1mo_y1), ach: data[0].occ_1mo_2y },
                                             { label: '2mo GL', total_port: Number(data[0].amount_port_2mo_y) + Number(data[0].amount_port_2mo_y1), used_port: Number(data[0].used_2mo_y) + Number(data[0].used_2mo_y1), ach: data[0].occ_2mo_2y },
@@ -161,25 +164,7 @@ const Page = () => {
                                         ]}
                                     />
                                 </div>
-                            </section>
-
-                            <section className="space-y-6">
-                                <div className="flex items-center">
-                                    <div className="w-1 h-6 bg-gradient-to-b from-orange-600 to-amber-600 rounded-full mr-3"></div>
-                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Demands</h2>
-                                </div>
-
-                                <div className="max-w-md">
-                                    <DemandData
-                                        data={[
-                                            { metric: 'YTD DEMANDS', value: data[0].target_ytd_demand },
-                                            { metric: 'CREATED', value: data[0].demand_created_mtd },
-                                            { metric: 'MoM', value: data[0].demand_created_mom },
-                                            { metric: 'Achieved', value: data[0].ach_demands },
-                                        ]}
-                                    />
-                                </div>
-                            </section>
+                            </div>
                         </div>
                     );
                 }
@@ -194,7 +179,16 @@ const Page = () => {
 
                 return null;
             })()}
-        </div>
+        </div >
     )
 }
 export default Page
+
+function getValueStyle(value: string) {
+    const valueNumber = parseInt(value.replace('%', ''), 10)
+    if (valueNumber > 0) {
+        return "text-green-500"
+    }
+
+    return "text-red-500"
+}

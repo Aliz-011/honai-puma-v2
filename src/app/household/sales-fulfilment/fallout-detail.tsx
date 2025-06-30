@@ -11,7 +11,7 @@ export const FalloutDetail = ({ data, selectedDate }: { data: SalesFulfilmentRes
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove();
 
-        const width = 1000;
+        const width = 1100;
         const height = 800;
         const margin = { top: 20, right: 200, bottom: 20, left: 20 };
 
@@ -24,7 +24,7 @@ export const FalloutDetail = ({ data, selectedDate }: { data: SalesFulfilmentRes
             // Level 1
             { id: 1, name: "FALLOUT", value: data[0].fallout, level: 1, percentage: data[0].fallout_per, color: "#7F1D1D", x: 0, y: 0, height: 200 },
             { id: 2, name: "PROVISION_ISSUED", value: data[0].provision_issued, level: 1, percentage: data[0].provision_issued_per, color: "#374151", x: 0, y: 0, height: 200 },
-            { id: 3, name: "OTHERS", value: data[0].provision_completed + data[0].registration + data[0].activation_completed, level: 1, percentage: parseFloat(data[0].provision_completed_per.replace('%', '')) + parseFloat(data[0].registration_per.replace('%', '')) + parseFloat(data[0].activation_completed_per.replace('%', '')) + '%', color: "#374151", x: 0, y: 0, height: 200 },
+            { id: 3, name: "OTHERS", value: data[0].provision_completed + data[0].registration + data[0].activation_completed, level: 1, percentage: (parseFloat(data[0].provision_completed_per.replace('%', '')) + parseFloat(data[0].registration_per.replace('%', '')) + parseFloat(data[0].activation_completed_per.replace('%', ''))).toFixed(2) + '%', color: "#374151", x: 0, y: 0, height: 200 },
 
             // Level 2
             { id: 4, name: "KENDALA TEKNIK", value: data[0].kendala_teknik, level: 2, percentage: (data[0].kendala_teknik / data[0].fallout * 100).toFixed(2) + '%', color: "#C2410C", x: 0, y: 0, height: 200 },

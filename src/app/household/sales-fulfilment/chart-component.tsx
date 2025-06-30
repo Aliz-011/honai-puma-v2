@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/chart"
 import { type SalesFulfilmentResponseData } from "@/types"
 import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
 
 const chartConfig = {
     target: {
@@ -256,14 +257,14 @@ export function ChartPie({ data, date }: PieParams) {
     ]
 
     return (
-        <Card className="@container/card flex flex-col max-h-[480px] shadow-none border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] px-0.5 ">
+        <Card className="@container/card flex flex-col max-h-[400px] shadow-none border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] px-0.5">
             <CardHeader>
                 <CardTitle>PS By Channel</CardTitle>
                 <CardDescription>{date}</CardDescription>
             </CardHeader>
-            <CardContent className=" max-h-full">
-                <ChartContainer config={chartConfigPie} className="mx-auto aspect-square max-h-[440px] pb-0 pt-0">
-                    <PieChart margin={{ top: 10, bottom: 80, left: 10, right: 10 }}>
+            <CardContent className="max-h-full">
+                <ChartContainer config={chartConfigPie} className="mx-auto aspect-square max-h-[300px] pb-0 pt-0">
+                    <PieChart margin={{ top: 0, bottom: 10, left: 10, right: 10 }}>
                         <ChartTooltip content={<ChartTooltipContent labelKey="visitors" className='w-[180px]' />} />
                         <Pie
                             data={chartData}
@@ -274,7 +275,7 @@ export function ChartPie({ data, date }: PieParams) {
                             innerRadius={0}
                             outerRadius={80}
                             label={({ payload, percent }) => payload.ach_fm_per}
-                            labelLine={false}
+                            labelLine
                         />
                         <ChartLegend
                             content={<ChartLegendContent nameKey="channel" />}
@@ -300,8 +301,15 @@ export const ProgressCard = ({ date, data, title }: IOREPSParams) => {
     return (
         <Card className="w-full text-center bg-white dark:bg-white/[0.03]">
             <CardHeader className="text-start">
-                <CardTitle className="text-lg font-semibold">{title}</CardTitle>
-                <CardDescription>{currStartOfMonth} - {currDate}</CardDescription>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+                        <CardDescription>{currStartOfMonth} - {currDate}</CardDescription>
+                    </div>
+                    <div className={cn("px-2 rounded-2xl", data[0].color)}>
+                        <span className="text-sm text-white">DRR</span>
+                    </div>
+                </div>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center p-6">
                 {/* Circular Progress Bar */}

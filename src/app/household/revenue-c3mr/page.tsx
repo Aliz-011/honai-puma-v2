@@ -139,7 +139,7 @@ const Page = () => {
                                         data={[
                                             { label: 'Rev NS', value: data[0].bill_amount_ns },
                                             { label: 'Rev All Unpaid', value: data[0].bill_amount_all_unpaid },
-                                            { label: 'Total', value: data[0].bill_amount_ns - data[0].bill_amount_all_unpaid },
+                                            { label: 'Total', value: (data[0].bill_amount_ns - data[0].bill_amount_all_unpaid).toFixed(2) },
                                         ]}
                                     />
                                 </div>

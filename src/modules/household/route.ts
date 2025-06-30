@@ -954,6 +954,7 @@ const app = new Hono()
             const currStartOfMonth = format(startOfMonth(endOfCurrMonth), 'yyyy-MM-dd')
             const currDate = format(endOfCurrMonth, 'yyyy-MM-dd')
             const prevStartOfMonth = format(startOfMonth(endOfPrevMonth2), 'yyyy-MM-dd')
+            const prevMonthSameDate = format(endOfPrevMonth2, 'yyyy-MM-dd')
             const prevDate = format(endOfPrevMonth, 'yyyy-MM-dd')
             const prevDate2 = format(endOfPrevMonth2, 'yyyy-MM-dd')
             const prevYearCurrDate = format(endOfPrevYearSameMonth, 'yyyy-MM-dd')
@@ -963,6 +964,8 @@ const app = new Hono()
 
             const currJanuaryFirst = `${currYear}-01-01`
             const prevJanuaryFirst = `${prevYear}-01-01`
+
+            console.log({ currStartOfMonth, currDate, prevStartOfMonth, prevMonthSameDate })
 
             const regionalTerritory = db
                 .select({ regional: territoryHousehold.regional })
@@ -1002,9 +1005,9 @@ const app = new Hono()
                     .select({
                         regional: sql<string>`'MALUKU DAN PAPUA'`.as('regional'),
                         status: sql<string>`
-                    CASE
-                        WHEN ${currOdpTable.status} IN ('BLACK', 'BLACKSYSTEM') THEN 'BLACK' ELSE ${currOdpTable.status}
-                    END`.as('status'),
+                        CASE
+                            WHEN ${currOdpTable.status} IN ('BLACK', 'BLACKSYSTEM') THEN 'BLACK' ELSE ${currOdpTable.status}
+                        END`.as('status'),
                         amount_port: sum(currOdpTable.is_total).as('amount_port'),
                         avai_port: sum(currOdpTable.avai).as('avai_port'),
                         used: sum(currOdpTable.used).as('used'),
@@ -1076,14 +1079,14 @@ const app = new Hono()
             const regionalDemands = db
                 .select({
                     regional: ih_demand_mysiis.region,
-                    demand_created_mtd: sql<number>`SUM(CASE WHEN MONTH(approved_at) = ${currMonth} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_mtd'),
-                    demand_created_m1: sql<number>`SUM(CASE WHEN MONTH(approved_at) = ${prevMonth} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_m1'),
+                    demand_created_mtd: sql<number>`SUM(CASE WHEN DATE_FORMAT(approved_at, '%Y-%m-%d') BETWEEN ${currStartOfMonth} AND ${currDate} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_mtd'),
+                    demand_created_m1: sql<number>`SUM(CASE WHEN DATE_FORMAT(approved_at, '%Y-%m-%d') BETWEEN ${prevStartOfMonth} AND ${prevMonthSameDate} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_m1'),
                 })
                 .from(ih_demand_mysiis)
                 .where(and(
                     gt(ih_demand_mysiis.target, 0),
-                    gt(ih_demand_mysiis.valid, 0),
                     eq(ih_demand_mysiis.region, 'MALUKU DAN PAPUA'),
+                    inArray(ih_demand_mysiis.status_new_bispro, ['Wait Approval AI', 'Draft']),
                     sql`YEAR(${ih_demand_mysiis.approved_at}) = ${currYear}`
                 ))
                 .groupBy(sql`1`)
@@ -1452,13 +1455,12 @@ const app = new Hono()
             const branchDemands = db
                 .select({
                     branch: ih_demand_mysiis.branch,
-                    demand_created_mtd: sql<number>`SUM(CASE WHEN MONTH(approved_at) = ${currMonth} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_mtd'),
-                    demand_created_m1: sql<number>`SUM(CASE WHEN MONTH(approved_at) = ${prevMonth} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_m1'),
+                    demand_created_mtd: sql<number>`SUM(CASE WHEN DATE_FORMAT(approved_at, '%Y-%m-%d') BETWEEN ${currStartOfMonth} AND ${currDate} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_mtd'),
+                    demand_created_m1: sql<number>`SUM(CASE WHEN DATE_FORMAT(approved_at, '%Y-%m-%d') BETWEEN ${prevStartOfMonth} AND ${prevMonthSameDate} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_m1')
                 })
                 .from(ih_demand_mysiis)
                 .where(and(
                     gt(ih_demand_mysiis.target, 0),
-                    gt(ih_demand_mysiis.valid, 0),
                     eq(ih_demand_mysiis.region, 'MALUKU DAN PAPUA'),
                     sql`YEAR(${ih_demand_mysiis.approved_at}) = ${currYear}`
                 ))
@@ -1841,13 +1843,12 @@ const app = new Hono()
             const wokDemands = db
                 .select({
                     wok: ih_demand_mysiis.wok,
-                    demand_created_mtd: sql<number>`SUM(CASE WHEN MONTH(approved_at) = ${currMonth} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_mtd'),
-                    demand_created_m1: sql<number>`SUM(CASE WHEN MONTH(approved_at) = ${prevMonth} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_m1'),
+                    demand_created_mtd: sql<number>`SUM(CASE WHEN DATE_FORMAT(approved_at, '%Y-%m-%d') BETWEEN ${currStartOfMonth} AND ${currDate} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_mtd'),
+                    demand_created_m1: sql<number>`SUM(CASE WHEN DATE_FORMAT(approved_at, '%Y-%m-%d') BETWEEN ${prevStartOfMonth} AND ${prevMonthSameDate} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_m1')
                 })
                 .from(ih_demand_mysiis)
                 .where(and(
                     gt(ih_demand_mysiis.target, 0),
-                    gt(ih_demand_mysiis.valid, 0),
                     eq(ih_demand_mysiis.region, 'MALUKU DAN PAPUA'),
                     sql`YEAR(${ih_demand_mysiis.approved_at}) = ${currYear}`
                 ))
@@ -2021,8 +2022,8 @@ const app = new Hono()
                     golive_ytd_per: sql<string>`d.golive_ytd_per`.as('golive_ytd_per'),
 
                     target_ytd_demand: sql<number>`t.ytd_demands`.as('target_ytd_demand'),
-                    demand_created_mtd: sql<number>`e.demand_created_mtd`.as('demand_created_mtd'),
-                    demand_created_m1: sql<number>`e.demand_created_m1`.as('demand_created_m1'),
+                    demand_created_mtd: sql<number>`COALESCE(e.demand_created_mtd, 0)`.as('demand_created_mtd'),
+                    demand_created_m1: sql<number>`COALESCE(e.demand_created_m1, 0)`.as('demand_created_m1'),
                     demand_created_mom: sql<string>`CONCAT(ROUND((e.demand_created_mtd - e.demand_created_m1) / e.demand_created_m1 * 100, 2), '%')`.as('demand_created_mom'),
                     ach_demands: sql<string>`CONCAT(ROUND(e.demand_created_mtd / t.ytd_demands * 100 ,2), '%')`.as('ach_demands'),
 
