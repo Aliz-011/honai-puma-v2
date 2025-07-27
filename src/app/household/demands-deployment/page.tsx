@@ -9,12 +9,20 @@ import { useSelectDate } from "@/hooks/use-select-date"
 import { useSelectBranch } from "@/hooks/use-select-branch"
 import { useSelectWok } from "@/hooks/use-select-wok"
 import { client } from "@/lib/client"
+import { useCurrentSession } from "@/hooks/use-current-session"
+import { redirect } from 'next/navigation'
 import { ProgressCard, GoliveCard, DemandData } from "./progress-card"
 
 const Page = () => {
     const { date: selectedDate } = useSelectDate()
     const { branch, setSelectedBranch } = useSelectBranch()
     const { wok, setSelectedWok } = useSelectWok()
+
+    const { data: session } = useCurrentSession()
+
+    if (!session?.user) {
+        redirect('/login')
+    }
 
     const { data, isLoading, isError, error, isSuccess } = useQuery({
         queryKey: ['demands-deployment', selectedDate, branch, wok],

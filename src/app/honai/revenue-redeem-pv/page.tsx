@@ -6,8 +6,16 @@ import { DataTable } from './data-table'
 import { useSelectDate } from '@/hooks/use-select-date'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '@/lib/client'
+import { useCurrentSession } from "@/hooks/use-current-session"
+import { redirect } from 'next/navigation'
 
 export default function RevenueRedeemPV() {
+    const { data: session } = useCurrentSession()
+
+    if (!session?.user) {
+        redirect('/login')
+    }
+
     const { date } = useSelectDate()
     const { data, isLoading, isRefetching, refetch } = useQuery({
         queryKey: ['revenue-redeem-pv', date],
@@ -23,8 +31,7 @@ export default function RevenueRedeemPV() {
         refetchOnWindowFocus: false,
         retry: 3,
         staleTime: 60 * 1000 * 60,
-        gcTime: 60 * 1000 * 10,
-
+        gcTime: 60 * 1000 * 10
     })
 
     return <div className="px-4 lg:px-6">

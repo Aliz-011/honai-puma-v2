@@ -1,23 +1,11 @@
 
 import { PropsWithChildren } from 'react'
-import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/app-sidebar'
 import { SiteHeader } from '@/components/site-header'
 
-import { auth } from '@/lib/auth'
-
 const HonaiLayout = async ({ children }: PropsWithChildren) => {
-    const session = await auth.api.getSession({
-        headers: await headers()
-    })
-
-    if (!session) {
-        redirect('/login')
-    }
-
     return (
         <SidebarProvider>
             <AppSidebar variant='inset' />

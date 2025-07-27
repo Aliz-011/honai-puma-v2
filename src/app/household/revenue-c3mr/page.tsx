@@ -11,12 +11,20 @@ import { useSelectWok } from "@/hooks/use-select-wok"
 import { useSelectDate } from "@/hooks/use-select-date"
 import { client } from "@/lib/client"
 import { ProgressCard } from "./progress-card"
+import { useCurrentSession } from "@/hooks/use-current-session"
+import { redirect } from 'next/navigation'
 
 const Page = () => {
     const { date: selectedDate } = useSelectDate()
     const { branch, setSelectedBranch } = useSelectBranch()
     const { wok, setSelectedWok } = useSelectWok()
     const [fetchDataClicked, setFetchDataClicked] = useState(false);
+
+    const { data: session } = useCurrentSession()
+
+    if (!session?.user) {
+        redirect('/login')
+    }
 
     const { data, isLoading, error, refetch, isRefetching, isError, isSuccess } = useQuery({
         queryKey: ['revenue-c3mr', selectedDate, branch, wok],

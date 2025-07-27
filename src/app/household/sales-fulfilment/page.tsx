@@ -16,12 +16,19 @@ import { useSelectDate } from "@/hooks/use-select-date"
 import { useSelectBranch } from "@/hooks/use-select-branch"
 import { useSelectWok } from "@/hooks/use-select-wok"
 import type { SalesFulfilmentResponseData } from '@/types'
+import { useCurrentSession } from "@/hooks/use-current-session"
+import { redirect } from 'next/navigation'
 
 const Page = () => {
     const { date: selectedDate } = useSelectDate()
     const { branch, setSelectedBranch } = useSelectBranch()
     const { wok, setSelectedWok } = useSelectWok()
-    const [fetchDataClicked, setFetchDataClicked] = useState(false);
+
+    const { data: session } = useCurrentSession()
+
+    if (!session?.user) {
+        redirect('/login')
+    }
 
     const { data, isLoading, isError, error, refetch, isSuccess } = useQuery({
         queryKey: ['sales-fulfilment', selectedDate, branch, wok],

@@ -6,9 +6,17 @@ import { DataTable } from '../data-table'
 import { useSelectDate } from '@/hooks/use-select-date'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '@/lib/client'
+import { useCurrentSession } from "@/hooks/use-current-session"
+import { redirect } from 'next/navigation'
 
 export default function RevenueSAPage() {
     const { date } = useSelectDate()
+    const { data: session } = useCurrentSession()
+
+    if (!session?.user) {
+        redirect('/login')
+    }
+
     const { data, isLoading, isRefetching, refetch } = useQuery({
         queryKey: ['revenue-sa-prabayar', date],
         queryFn: async () => {

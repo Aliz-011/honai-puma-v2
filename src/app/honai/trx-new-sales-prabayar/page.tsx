@@ -11,6 +11,8 @@ import { useSelectBranch } from '@/hooks/use-select-branch'
 import { useSelectSubbranch } from '@/hooks/use-select-subbranch'
 import { useSelectCluster } from '@/hooks/use-select-cluster'
 import { useSelectKabupaten } from '@/hooks/use-select-kabupaten'
+import { useCurrentSession } from "@/hooks/use-current-session"
+import { redirect } from 'next/navigation'
 
 export default function RevenueNewSalesPage() {
     const { date } = useSelectDate()
@@ -18,6 +20,13 @@ export default function RevenueNewSalesPage() {
     const { subbranch } = useSelectSubbranch()
     const { cluster } = useSelectCluster()
     const { kabupaten } = useSelectKabupaten()
+
+    const { data: session } = useCurrentSession()
+
+    if (!session?.user) {
+        redirect('/login')
+    }
+
     const { data, isLoading, isRefetching, refetch } = useQuery({
         queryKey: ['trx-new-sales-prabayar', date, branch, subbranch, cluster, kabupaten],
         queryFn: async ({ queryKey }) => {

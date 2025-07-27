@@ -1,5 +1,5 @@
 import { queryOptions, useQuery } from "@tanstack/react-query"
-import { authClient } from '@/lib/auth-client'
+import type { Session } from "@auth/core/types";
 
 export const useCurrentSession = () => {
     return useQuery(currentSessionOptions)
@@ -8,13 +8,13 @@ export const useCurrentSession = () => {
 export const currentSessionOptions = queryOptions({
     queryKey: ['current-session'],
     queryFn: async () => {
-        const response = await authClient.getSession()
+        // const response = await client.api['current-user'].$get()
+        const response = await fetch('/api/auth/session')
 
-        if (response.error) {
-            throw new Error(response.error.message)
-        }
-
-        return response.data
+        return await response.json() as Session
     },
-    staleTime: 60 * 1000 * 15
+    refetchOnWindowFocus: false,
+    retry: 1,
+    staleTime: 5 * (60 * 1000),
+    gcTime: 10 * (60 * 1000),
 })

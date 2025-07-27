@@ -15,7 +15,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from "@/components/ui/skeleton"
 
-import { cn, formatToBillion, getAchGrowthColor, getGrowthColor } from "@/lib/utils"
+import { cn, getAchGrowthColor, getGrowthColor } from "@/lib/utils"
 
 type Params = {
     data?: Revenue[];

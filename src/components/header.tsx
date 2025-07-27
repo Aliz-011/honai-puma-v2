@@ -4,6 +4,7 @@ import { Command, LogOutIcon, UserCircleIcon } from "lucide-react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { signOut } from "@hono/auth-js/react"
 
 import {
     Avatar,
@@ -21,22 +22,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 import { useCurrentSession } from "@/hooks/use-current-session"
-import { client } from "@/lib/client"
 
 export const Header = () => {
 
     const navigate = useRouter()
-    const { data: user } = useCurrentSession()
+    const { data: session } = useCurrentSession()
     const queryClient = useQueryClient()
 
     const mutation = useMutation({
-        mutationFn: async () => {
-            const response = await client.api.signout.$post()
-
-            return await response.json()
-        },
+        mutationFn: async () => await signOut()
+        ,
         onSuccess: () => {
             navigate.push('/login')
+            navigate.refresh()
             queryClient.invalidateQueries({ queryKey: ['current-session'] })
         }
     })
@@ -62,8 +60,8 @@ export const Header = () => {
                     <DropdownMenu>
                         <DropdownMenuTrigger className="cursor-pointer rounded-full">
                             <Avatar className="h-10 w-10 rounded-full grayscale">
-                                <AvatarImage src='https://github.com/shadcn.png' alt={user?.user.name} />
-                                <AvatarFallback className="rounded-full">{user?.user.name.split(' ')[0]}</AvatarFallback>
+                                <AvatarImage src='https://github.com/shadcn.png' alt={session?.user?.name || 'FC'} />
+                                <AvatarFallback className="rounded-full">{session?.user?.name ? session.user.name.split(' ')[0] : 'FC'}</AvatarFallback>
                             </Avatar>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
@@ -74,13 +72,13 @@ export const Header = () => {
                             <DropdownMenuLabel className="p-0 font-normal">
                                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                     <Avatar className="h-8 w-8 rounded-lg">
-                                        <AvatarImage src='https://github.com/shadcn.png' alt={user?.user.name} />
+                                        <AvatarImage src='https://github.com/shadcn.png' alt={session?.user?.name || 'FC'} />
                                         <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                                     </Avatar>
                                     <div className="grid flex-1 text-left text-sm leading-tight">
-                                        <span className="truncate font-medium">{user?.user.name}</span>
+                                        <span className="truncate font-medium">{session?.user?.name}</span>
                                         <span className="truncate text-xs text-muted-foreground">
-                                            {user?.user.email}
+                                            {session?.user?.email}
                                         </span>
                                     </div>
                                 </div>
@@ -93,14 +91,16 @@ export const Header = () => {
                                 </DropdownMenuItem>
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="cursor-pointer">
+                            <DropdownMenuItem className="cursor-pointer" asChild>
                                 <form onSubmit={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
 
                                     mutation.mutate()
-                                }}>
-                                    <button className="inline-flex items-center gap-1">
+                                }}
+                                    className="w-full"
+                                >
+                                    <button className="inline-flex items-center gap-1 w-full">
                                         <LogOutIcon />
                                         Log out
                                     </button>

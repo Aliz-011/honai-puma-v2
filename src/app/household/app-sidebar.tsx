@@ -50,6 +50,11 @@ const data = {
             icon: BarChartIcon,
         },
         {
+            title: "CONSOLIDATION MOBILE HH",
+            url: "/household/consolidation-mobile-hh",
+            icon: HandCoins,
+        },
+        {
             title: "OTHERS",
             url: "/household/others",
             icon: FolderIcon,

@@ -1,11 +1,13 @@
 'use client'
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
+import { useQueryClient, useMutation } from "@tanstack/react-query"
 import {
     LogOutIcon,
     MoreVerticalIcon,
     UserCircleIcon,
 } from "lucide-react"
+import { signOut } from "@hono/auth-js/react"
 
 import {
     Avatar,
@@ -29,8 +31,6 @@ import {
 } from "@/components/ui/sidebar"
 
 import { useCurrentSession } from "@/hooks/use-current-session"
-import { useRouter } from "next/navigation"
-import { client } from "@/lib/client"
 
 export function NavUser() {
     const { isMobile } = useSidebar()
@@ -39,16 +39,15 @@ export function NavUser() {
     const queryClient = useQueryClient()
 
     const mutation = useMutation({
-        mutationFn: async () => {
-            const response = await client.api.signout.$post()
-
-            return await response.json()
-        },
+        mutationFn: async () => await signOut()
+        ,
         onSuccess: () => {
             navigate.push('/login')
+            navigate.refresh()
             queryClient.invalidateQueries({ queryKey: ['current-session'] })
         }
     })
+
 
     return (
         <SidebarMenu>
@@ -60,13 +59,13 @@ export function NavUser() {
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
                             <Avatar className="h-8 w-8 rounded-lg grayscale">
-                                <AvatarImage src='https://github.com/shadcn.png' alt={user?.user.name} />
-                                <AvatarFallback className="rounded-lg">{user?.user.name.split(' ')[0]}</AvatarFallback>
+                                <AvatarImage src='https://github.com/shadcn.png' alt={user?.user?.name ?? "Shadcn"} />
+                                <AvatarFallback className="rounded-lg">{user?.user?.name ? user.user.name.split(' ')[0] : 'SN'}</AvatarFallback>
                             </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight">
-                                <span className="truncate font-medium">{user?.user.name}</span>
+                                <span className="truncate font-medium">{user?.user?.name}</span>
                                 <span className="truncate text-xs text-muted-foreground">
-                                    {user?.user.email}
+                                    {user?.user?.email}
                                 </span>
                             </div>
                             <MoreVerticalIcon className="ml-auto size-4" />
@@ -81,13 +80,13 @@ export function NavUser() {
                         <DropdownMenuLabel className="p-0 font-normal">
                             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                 <Avatar className="h-8 w-8 rounded-lg">
-                                    <AvatarImage src='https://github.com/shadcn.png' alt={user?.user.name} />
+                                    <AvatarImage src='https://github.com/shadcn.png' alt={user?.user?.name ?? 'Shadcn'} />
                                     <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-medium">{user?.user.name}</span>
+                                    <span className="truncate font-medium">{user?.user?.name}</span>
                                     <span className="truncate text-xs text-muted-foreground">
-                                        {user?.user.email}
+                                        {user?.user?.email}
                                     </span>
                                 </div>
                             </div>
@@ -100,14 +99,16 @@ export function NavUser() {
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="cursor-pointer">
+                        <DropdownMenuItem className="cursor-pointer" asChild>
                             <form onSubmit={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
 
                                 mutation.mutate()
-                            }}>
-                                <button className="inline-flex items-center gap-1">
+                            }}
+                                className="w-full"
+                            >
+                                <button className="inline-flex items-center gap-1 w-full">
                                     <LogOutIcon />
                                     Log out
                                 </button>

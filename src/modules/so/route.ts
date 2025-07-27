@@ -1,18 +1,10 @@
 import { Hono } from "hono";
 import { z } from 'zod'
-import { and, between, eq, gte, inArray, lte, not, sql, sum } from "drizzle-orm";
+import { and, eq, sql, sum } from "drizzle-orm";
 import { subMonths, subDays, format, subYears, endOfMonth, getDaysInMonth } from 'date-fns'
 
-import { db, db6 } from "@/db";
-import {
-    branches,
-    regionals,
-    clusters,
-    kabupatens,
-    subbranches,
-    targetSO,
-    territoryArea4
-} from "@/db/schema/puma_2025";
+import { db } from "@/db";
+import { territoryArea4 } from "@/db/schema/puma_2025";
 import { zValidator } from "@/lib/validator-wrapper";
 import { summarySoAllRegional, summarySoAllBranch, summarySoAllSubbranch, summarySoAllCluster, summarySoAllKabupaten, feiTargetPuma } from "@/db/schema/v_honai_puma";
 import { index, unionAll } from "drizzle-orm/mysql-core";

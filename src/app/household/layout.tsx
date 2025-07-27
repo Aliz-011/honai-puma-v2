@@ -1,19 +1,10 @@
 import { PropsWithChildren } from "react"
-import { headers } from "next/headers"
 
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from './app-sidebar'
 import { SiteHeader } from "@/components/site-header"
-import { authClient } from "@/lib/auth-client"
-import { redirect } from "next/navigation"
 
 const HouseholdLayout = async ({ children }: PropsWithChildren) => {
-    const session = await authClient.getSession()
-
-    if (!session) {
-        redirect('/login')
-    }
-
     return (
         <SidebarProvider>
             <AppSidebar variant='inset' />

@@ -191,7 +191,7 @@ export const Filters = ({ daysBehind, handleClick, disabled = false }: { daysBeh
                 </Select>
             </div>
             <div className="space-y-2 mt-auto">
-                <button onClick={handleClick} disabled={!selectedBranch || (!selectedBranch && !wok) || disabled} className="cursor-pointer px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-xs font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl disabled:pointer-events-none disabled:opacity-50">
+                <button onClick={handleClick} disabled={!selectedBranch || (!selectedBranch && !selectedWok) || disabled} className="cursor-pointer px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-xs font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl disabled:pointer-events-none disabled:opacity-50">
                     <Funnel className="w-3 h-3 inline mr-1" />
                     Clear Filter
                 </button>

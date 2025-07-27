@@ -38,6 +38,10 @@ body,
   padding: 0;
 }
 
+body::-webkit-scrollbar {
+  display: none;
+}
+
 :root {
   --radius: 0.375rem;
   --background: oklch(0.98 0 56.38);

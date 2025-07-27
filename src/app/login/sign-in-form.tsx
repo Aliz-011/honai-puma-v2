@@ -5,9 +5,8 @@ import { HTTPException } from "hono/http-exception";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import { signIn } from "@hono/auth-js/react"
 
-import { authClient } from "@/lib/auth-client";
-import Loader from "@/components/loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,30 +22,23 @@ import { client } from "@/lib/client";
 type ResponseType = InferResponseType<typeof client.api.signin.$post>
 type RequestType = InferRequestType<typeof client.api.signin.$post>['json']
 
-export default function SignInForm({
-	onSwitchToSignUp,
-}: {
-	onSwitchToSignUp: () => void;
-}) {
+export default function SignInForm() {
 	const navigate = useRouter();
-	const queryClient = useQueryClient()
-	const { isPending } = authClient.useSession();
+	const queryClient = useQueryClient();
 
 	const mutation = useMutation<ResponseType, HTTPException, RequestType>({
 		mutationFn: async (values) => {
-			const response = await client.api.signin.$post({ json: values })
+			const response = await signIn('credentials', {
+				redirect: false,
+				...values
+			})
 
-			return await response.json()
-		},
-		onSuccess: () => {
-			navigate.push('/honai');
-			toast.success("Sign in successful");
-			navigate.refresh()
-			queryClient.invalidateQueries({ queryKey: ['current-session'] })
-		},
-		onError: (error) => {
-			toast.error(error.message || 'Failed, please try again.');
-		},
+			if (response?.error) {
+				throw new Error(response.error || 'Failed to sign in')
+			}
+
+			return { message: 'Success' }
+		}
 	})
 
 	const form = useForm({
@@ -55,7 +47,16 @@ export default function SignInForm({
 			password: "",
 		},
 		onSubmit: async ({ value }) => {
-			await mutation.mutateAsync(value)
+			mutation.mutate({ ...value }, {
+				onSuccess: () => {
+					navigate.refresh()
+					toast.success("Sign in successful");
+					queryClient.invalidateQueries({ queryKey: ['current-session'] })
+				},
+				onError: (error) => {
+					toast.error(error.message || 'Failed, please try again.');
+				},
+			})
 		},
 		validators: {
 			onSubmit: z.object({
@@ -64,10 +65,6 @@ export default function SignInForm({
 			}),
 		},
 	});
-
-	if (isPending) {
-		return <Loader />;
-	}
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -139,23 +136,13 @@ export default function SignInForm({
 								<Button
 									type="submit"
 									className="w-full"
-									disabled={!state.canSubmit || state.isSubmitting}
+									disabled={!state.canSubmit || state.isSubmitting || mutation.isPending}
 								>
 									{state.isSubmitting ? "Submitting..." : "Sign In"}
 								</Button>
 							)}
 						</form.Subscribe>
 					</form>
-
-					<div className="mt-4 text-center">
-						<Button
-							variant="link"
-							onClick={onSwitchToSignUp}
-							className="text-indigo-600 hover:text-indigo-800"
-						>
-							Do not have an account yet? Sign Up
-						</Button>
-					</div>
 				</CardContent>
 			</Card>
 		</div>
