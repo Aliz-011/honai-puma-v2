@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from "@tanstack/react-query"
-import { useState, useMemo, Fragment } from "react"
+import { useMemo, Fragment } from "react"
 import { format, subDays } from "date-fns"
 
 import { SectionCards } from "./section-cards"
@@ -120,6 +120,7 @@ const Page = () => {
 
         const ioChartData = levelData.map(item => ({
             territory: item.name,
+            date: item.ioreps_event_date,
             target: item.target_all_sales,
             actual: item.io_m,
             drr: item.drr_io,
@@ -129,6 +130,7 @@ const Page = () => {
 
         const reChartData = levelData.map(item => ({
             territory: item.name,
+            date: item.ioreps_event_date,
             target: item.target_all_sales,
             actual: item.re_m,
             drr: item.drr_re,
@@ -138,6 +140,7 @@ const Page = () => {
 
         const psChartData = levelData.map(item => ({
             territory: item.name,
+            date: item.ioreps_event_date,
             target: item.target_all_sales,
             actual: item.ps_m,
             drr: item.drr_ps,

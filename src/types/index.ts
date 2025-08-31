@@ -202,6 +202,7 @@ export type SalesFulfilmentResponseData = {
     wo_gt_30: number;
     wo_gt_30_per: string;
     total_wo: number;
+    ioreps_event_date: string;
 }
 
 export type DemandsDeploymentResponseData = {

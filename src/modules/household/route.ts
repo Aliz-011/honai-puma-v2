@@ -1,13 +1,14 @@
 import { endOfMonth, format, getDaysInMonth, subDays, subMonths, subYears, startOfMonth } from "date-fns";
-import { and, count, eq, inArray, or, sql, sum, isNotNull, getTableColumns, notInArray, gt } from "drizzle-orm";
+import { and, count, eq, inArray, or, sql, sum, isNotNull, getTableColumns, notInArray, gt, max } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod"
 
 import { zValidator } from "@/lib/validator-wrapper";
-import { targetHouseholdAll, summaryIoRePsBranch, summaryIoRePsWok, targetTerritoryDemands, summaryHouseholdC3mrBranch, summaryHouseholdC3mrSto, targetRevenueC3mr, summaryIoRePsRegional } from "@/db/schema/v_honai_puma";
+import { targetHouseholdAll, summaryIoRePsBranch, summaryIoRePsWok, targetTerritoryDemands, summaryHouseholdC3mrBranch, summaryHouseholdC3mrSto, targetRevenueC3mr, summaryIoRePsRegional, summaryAllConsolidationBranch, summaryAllConsolidationCluster, summaryAllConsolidationKabupaten, summaryBBConsolidationBranch, summaryBBConsolidationCluster, summaryBBConsolidationKabupaten, summaryPayloadConsolidationBranch, summaryPayloadConsolidationCluster, summaryPayloadConsolidationKabupaten, summaryGoliveRegional, summaryGoliveBranch, summaryGoliveWok, summaryGolivePortRegional, summaryGolivePortBranch, summaryGolivePortWok, summaryOdpRegional, summaryOdpBranch, summaryOdpWok } from "@/db/schema/v_honai_puma";
 import { dynamicIhAvailOdpA4, ih_demand_mysiis, ih_occ_golive_ihld, dynamicIhOrderingDetailOrderTable, ih_information_odp, dynamicIhC3mr } from '@/db/schema/household'
-import { territoryHousehold } from '@/db/schema/puma_2025'
+import { territoryArea4, territoryHousehold } from '@/db/schema/puma_2025'
 import { db } from "@/db";
+import { unionAll } from "drizzle-orm/mysql-core";
 
 const app = new Hono()
     .get('/io-re-ps', zValidator('query', z.object({ date: z.string().optional(), branch: z.string().optional(), wok: z.string().optional() })),
@@ -47,11 +48,22 @@ const app = new Hono()
                 .groupBy(sql`1`)
                 .as('a')
 
+            const [ioreps_regional] = await db
+                .select({
+                    event_date: sql<string>`COALESCE(
+                        (SELECT event_date FROM ${summaryIoRePsRegional} WHERE event_date = ${currDate} LIMIT 1),
+                        (SELECT MAX(event_date) FROM ${summaryIoRePsRegional})
+                    )`,
+
+                })
+                .from(summaryIoRePsRegional)
+                .limit(1)
+
             const summaryRegional = db
                 .select()
                 .from(summaryIoRePsRegional)
                 .where(and(
-                    eq(summaryIoRePsRegional.event_date, currDate),
+                    eq(summaryIoRePsRegional.event_date, ioreps_regional.event_date),
                     eq(summaryIoRePsRegional.channel, 'all'),
                     eq(summaryIoRePsRegional.package, 'all'),
                 ))
@@ -302,7 +314,9 @@ const app = new Hono()
                     wo_15_30_per: regionalReNonPS.wo_15_30_per,
                     wo_gt_30: regionalReNonPS.wo_gt_30,
                     wo_gt_30_per: regionalReNonPS.wo_gt_30_per,
-                    total_wo: regionalReNonPS.total_wo
+                    total_wo: regionalReNonPS.total_wo,
+
+                    ioreps_event_date: sql<string>`${ioreps_regional.event_date}`.as('ioreps_event_date')
                 })
                 .from(regionalTerritory)
                 .leftJoin(summaryRegional, eq(regionalTerritory.regional, summaryRegional.regional))
@@ -327,11 +341,22 @@ const app = new Hono()
                 .groupBy(territoryHousehold.branch)
                 .as('a')
 
+            const [ioreps_branch] = await db
+                .select({
+                    event_date: sql<string>`COALESCE(
+                        (SELECT event_date FROM ${summaryIoRePsBranch} WHERE event_date = ${currDate} LIMIT 1),
+                        (SELECT MAX(event_date) FROM ${summaryIoRePsBranch})
+                    )`,
+
+                })
+                .from(summaryIoRePsBranch)
+                .limit(1)
+
             const summaryBranch = db
                 .select()
                 .from(summaryIoRePsBranch)
                 .where(and(
-                    eq(summaryIoRePsBranch.event_date, currDate),
+                    eq(summaryIoRePsBranch.event_date, ioreps_branch.event_date),
                     eq(summaryIoRePsBranch.channel, 'all'),
                     eq(summaryIoRePsBranch.package, 'all'),
                     branch ? eq(summaryIoRePsBranch.branch, branch) : undefined
@@ -587,7 +612,9 @@ const app = new Hono()
                     wo_15_30_per: branchReNonPS.wo_15_30_per,
                     wo_gt_30: branchReNonPS.wo_gt_30,
                     wo_gt_30_per: branchReNonPS.wo_gt_30_per,
-                    total_wo: branchReNonPS.total_wo
+                    total_wo: branchReNonPS.total_wo,
+
+                    ioreps_event_date: sql<string>`${ioreps_branch.event_date}`.as('ioreps_event_date')
                 })
                 .from(branchTerritory)
                 .leftJoin(summaryBranch, eq(branchTerritory.branch, summaryBranch.branch))
@@ -619,11 +646,22 @@ const app = new Hono()
                 .groupBy(territoryHousehold.wok)
                 .as('a')
 
+            const [ioreps_wok] = await db
+                .select({
+                    event_date: sql<string>`COALESCE(
+                        (SELECT event_date FROM ${summaryIoRePsWok} WHERE event_date = ${currDate} LIMIT 1),
+                        (SELECT MAX(event_date) FROM ${summaryIoRePsWok})
+                    )`,
+
+                })
+                .from(summaryIoRePsWok)
+                .limit(1)
+
             const summaryWok = db
                 .select()
                 .from(summaryIoRePsWok)
                 .where(and(
-                    eq(summaryIoRePsWok.event_date, currDate),
+                    eq(summaryIoRePsWok.event_date, ioreps_wok.event_date),
                     eq(summaryIoRePsWok.channel, 'all'),
                     eq(summaryIoRePsWok.package, 'all'),
                     branch && wok ?
@@ -894,7 +932,9 @@ const app = new Hono()
                     wo_15_30_per: wokReNonPS.wo_15_30_per,
                     wo_gt_30: wokReNonPS.wo_gt_30,
                     wo_gt_30_per: wokReNonPS.wo_gt_30_per,
-                    total_wo: branchReNonPS.total_wo
+                    total_wo: branchReNonPS.total_wo,
+
+                    ioreps_event_date: sql<string>`${ioreps_wok.event_date}`.as('ioreps_event_date')
                 })
                 .from(wokTerritory)
                 .leftJoin(summaryWok, eq(wokTerritory.wok, summaryWok.wok))
@@ -964,8 +1004,6 @@ const app = new Hono()
 
             const currJanuaryFirst = `${currYear}-01-01`
             const prevJanuaryFirst = `${prevYear}-01-01`
-
-            console.log({ currStartOfMonth, currDate, prevStartOfMonth, prevMonthSameDate })
 
             const regionalTerritory = db
                 .select({ regional: territoryHousehold.regional })
@@ -2112,6 +2150,217 @@ const app = new Hono()
 
             return c.json({ data: finalDataRevenue })
         })
+    .get('/demands-deployment-v2', zValidator('query', z.object({ date: z.string().optional(), branch: z.string().optional(), wok: z.string().optional() })),
+        async c => {
+            const { date, branch, wok } = c.req.valid('query')
+            const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
+
+            const currMonth = format(selectedDate, 'MM')
+            const currYear = format(selectedDate, 'yyyy')
+            const latestMonth = parseInt(format(selectedDate, 'M'), 10)
+            const isPrevMonthLastYear = currMonth === '01'
+            const prevMonth = isPrevMonthLastYear ? '12' : format(subMonths(selectedDate, 1), 'MM')
+            const prevMonthYear = isPrevMonthLastYear ? format(subYears(selectedDate, 1), 'yyyy') : format(selectedDate, 'yyyy')
+            const prevYear = format(subYears(selectedDate, 1), 'yyyy')
+
+            const lastDayOfSelectedMonth = endOfMonth(selectedDate);
+            const isEndOfMonth = selectedDate.getDate() === lastDayOfSelectedMonth.getDate();
+
+            const endOfCurrMonth = isEndOfMonth ? lastDayOfSelectedMonth : selectedDate;
+            const endOfPrevMonth = endOfMonth(subMonths(selectedDate, 1))
+            const endOfPrevMonth2 = isEndOfMonth ? endOfMonth(subMonths(selectedDate, 1)) : subMonths(selectedDate, 1)
+            const endOfPrevYearSameMonth = isEndOfMonth ? endOfMonth(subYears(selectedDate, 1)) : subYears(selectedDate, 1);
+
+            const currStartOfMonth = format(startOfMonth(endOfCurrMonth), 'yyyy-MM-dd')
+            const currDate = format(endOfCurrMonth, 'yyyy-MM-dd')
+            const prevStartOfMonth = format(startOfMonth(endOfPrevMonth2), 'yyyy-MM-dd')
+            const prevMonthSameDate = format(endOfPrevMonth2, 'yyyy-MM-dd')
+            const prevDate = format(endOfPrevMonth, 'yyyy-MM-dd')
+            const prevDate2 = format(endOfPrevMonth2, 'yyyy-MM-dd')
+            const prevYearCurrDate = format(endOfPrevYearSameMonth, 'yyyy-MM-dd')
+
+            const regionalTerritory = db
+                .select({ regional: territoryHousehold.regional })
+                .from(territoryHousehold)
+                .where(eq(territoryHousehold.regional, 'MALUKU DAN PAPUA'))
+                .groupBy(territoryHousehold.regional)
+                .as('a')
+
+            const regionalOdp = db
+                .select()
+                .from(summaryOdpRegional)
+                .where(and(
+                    eq(summaryOdpRegional.regional, 'MALUKU DAN PAPUA'),
+                    eq(summaryOdpRegional.tgl, currDate)
+                ))
+                .as('b')
+
+            const regionalGolive = db
+                .select()
+                .from(summaryGoliveRegional)
+                .as('c')
+
+            const regionalDemands = db
+                .select({
+                    regional: ih_demand_mysiis.region,
+                    demand_created_mtd: sql<number>`SUM(CASE WHEN DATE_FORMAT(approved_at, '%Y-%m-%d') BETWEEN ${currStartOfMonth} AND ${currDate} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_mtd'),
+                    demand_created_m1: sql<number>`SUM(CASE WHEN DATE_FORMAT(approved_at, '%Y-%m-%d') BETWEEN ${prevStartOfMonth} AND ${prevMonthSameDate} THEN ${ih_demand_mysiis.target} END)`.as('demand_created_m1'),
+                })
+                .from(ih_demand_mysiis)
+                .where(and(
+                    gt(ih_demand_mysiis.target, 0),
+                    eq(ih_demand_mysiis.region, 'MALUKU DAN PAPUA'),
+                    inArray(ih_demand_mysiis.status_new_bispro, ['Wait Approval AI', 'Draft']),
+                    sql`YEAR(${ih_demand_mysiis.approved_at}) = ${currYear}`
+                ))
+                .groupBy(sql`1`)
+                .as('d')
+
+            const regionalGolivePort = db
+                .select()
+                .from(summaryGolivePortRegional)
+                .as('e')
+
+            const regionalTargetDemands = db
+                .select({
+                    regional: sql<string>`b.regional`.as('regional'),
+                    ytd_demands: sum(targetTerritoryDemands.ytd_demand).as('ytd_demands')
+                })
+                .from(targetTerritoryDemands)
+                .rightJoin(
+                    db
+                        .selectDistinct({ regional: territoryHousehold.regional, branch: territoryHousehold.branch, wok: territoryHousehold.wok })
+                        .from(territoryHousehold)
+                        .as('b'),
+                    and(
+                        eq(targetTerritoryDemands.branch, sql`b.branch`),
+                        eq(targetTerritoryDemands.wok, sql`b.wok`)
+                    )
+                )
+                .where(eq(targetTerritoryDemands.periode, currYear))
+                .groupBy(sql`1`)
+                .as('t')
+
+            const regionalFinalQuery = db
+                .select({
+                    name: regionalTerritory.regional,
+
+                    used_black: regionalOdp.black_used_m,
+                    used_red: regionalOdp.red_used_m,
+                    used_green: regionalOdp.green_used_m,
+                    used_yellow: regionalOdp.yellow_used_m,
+                    used: regionalOdp.total_used_m,
+
+                    used_black_m1: regionalOdp.black_used_m1,
+                    used_red_m1: regionalOdp.red_used_m1,
+                    used_green_m1: regionalOdp.green_used_m1,
+                    used_yellow_m1: regionalOdp.yellow_used_m1,
+                    used_m1: regionalOdp.total_used_m1,
+
+                    avai_port_black: regionalOdp.black_avai_m,
+                    avai_port_red: regionalOdp.red_avai_m,
+                    avai_port_yellow: regionalOdp.yellow_avai_m,
+                    avai_port_green: regionalOdp.green_avai_m,
+                    avai_port: regionalOdp.total_avai_m,
+
+                    avai_port_black_m1: regionalOdp.black_avai_m1,
+                    avai_port_red_m1: regionalOdp.red_avai_m1,
+                    avai_port_yellow_m1: regionalOdp.yellow_avai_m1,
+                    avai_port_green_m1: regionalOdp.green_avai_m1,
+                    avai_port_m1: regionalOdp.total_avai_m1,
+
+                    amount_port_black: regionalOdp.black_amount_m,
+                    amount_port_red: regionalOdp.red_amount_m,
+                    amount_port_yellow: regionalOdp.yellow_amount_m,
+                    amount_port_green: regionalOdp.green_amount_m,
+
+                    amount_port_black_m1: regionalOdp.black_amount_m1,
+                    amount_port_red_m1: regionalOdp.red_amount_m1,
+                    amount_port_yellow_m1: regionalOdp.yellow_amount_m1,
+                    amount_port_green_m1: regionalOdp.green_amount_m1,
+
+                    odp_black: regionalOdp.black_odp_m,
+                    odp_red: regionalOdp.red_odp_m,
+                    odp_yellow: regionalOdp.yellow_odp_m,
+                    odp_green: regionalOdp.green_odp_m,
+                    odp: regionalOdp.total_odp_m,
+
+                    golive_m: regionalGolive.golive_m,
+                    golive_m1: regionalGolive.golive_m1,
+                    golive_mom: sql<string>`CONCAT(c.golive_mom, '%')`.as('golive_mom'),
+                    golive_m12: regionalGolive.golive_m12,
+                    golive_y: regionalGolive.golive_y,
+                    golive_y1: regionalGolive.golive_y1,
+                    golive_yoy: sql<string>`CONCAT(c.golive_yoy, '%')`.as('golive_yoy'),
+                    golive_ytd: sql<string>`CONCAT(c.golive_ytd, '%')`.as('golive_ytd'),
+
+                    target_ytd_demand: regionalTargetDemands.ytd_demands,
+                    demand_created_mtd: regionalDemands.demand_created_mtd,
+                    demand_created_m1: regionalDemands.demand_created_m1,
+                    demand_created_mom: sql<string>`CONCAT(ROUND((d.demand_created_mtd / d.demand_created_m1 - 1) * 100, 2), '%')`.as('demand_created_mom'),
+                    ach_demands: sql<string>`CONCAT(COALESCE(ROUND(d.demand_created_mtd / t.ytd_demands * 100, 2) ,0), '%')`.as('ach_demands'),
+
+                    avai_port_1mo_y: regionalGolivePort.avai_port_1mo_y,
+                    avai_port_2mo_y: regionalGolivePort.avai_port_2mo_y,
+                    avai_port_3mo_y: regionalGolivePort.avai_port_3mo_y,
+                    avai_port_4mo_y: regionalGolivePort.avai_port_4mo_y,
+
+                    used_1mo_y: regionalGolivePort.used_1mo_y,
+                    used_2mo_y: regionalGolivePort.used_2mo_y,
+                    used_3mo_y: regionalGolivePort.used_3mo_y,
+                    used_4mo_y: regionalGolivePort.used_4mo_y,
+                    used_gt_6mo_y: regionalGolivePort.used_gt_6mo_y,
+                    used_all_mo_y: regionalGolivePort.used_all_mo_y,
+
+                    amount_port_1mo_y: regionalGolivePort.amount_port_1mo_y,
+                    amount_port_2mo_y: regionalGolivePort.amount_port_2mo_y,
+                    amount_port_3mo_y: regionalGolivePort.amount_port_3mo_y,
+                    amount_port_4mo_y: regionalGolivePort.amount_port_4mo_y,
+                    amount_port_gt_6mo_y: regionalGolivePort.amount_port_gt_6mo_y,
+                    amount_port_all_mo_y: regionalGolivePort.amount_port_all_mo_y,
+
+                    used_1mo_y1: regionalGolivePort.used_1mo_y1,
+                    used_2mo_y1: regionalGolivePort.used_2mo_y1,
+                    used_3mo_y1: regionalGolivePort.used_3mo_y1,
+                    used_4mo_y1: regionalGolivePort.used_4mo_y1,
+                    used_gt_6mo_y1: regionalGolivePort.used_gt_6mo_y1,
+                    used_all_mo_y1: regionalGolivePort.used_all_mo_y1,
+
+                    amount_port_1mo_y1: regionalGolivePort.amount_port_1mo_y1,
+                    amount_port_2mo_y1: regionalGolivePort.amount_port_2mo_y1,
+                    amount_port_3mo_y1: regionalGolivePort.amount_port_3mo_y1,
+                    amount_port_4mo_y1: regionalGolivePort.amount_port_4mo_y1,
+                    amount_port_gt_6mo_y1: regionalGolivePort.amount_port_gt_6mo_y1,
+                    amount_port_all_mo_y1: regionalGolivePort.amount_port_all_mo_y1,
+
+                    occ_1mo_y: sql<string>`CONCAT(COALESCE(ROUND((e.used_1mo_y / e.amount_port_1mo_y - 1) * 100, 2), 0), '%')`.as('occ_1mo_y'),
+                    occ_2mo_y: sql<string>`CONCAT(COALESCE(ROUND((e.used_2mo_y / e.amount_port_2mo_y - 1) * 100, 2), 0), '%')`.as('occ_2mo_y'),
+                    occ_3mo_y: sql<string>`CONCAT(COALESCE(ROUND((e.used_3mo_y / e.amount_port_3mo_y - 1) * 100, 2), 0), '%')`.as('occ_3mo_y'),
+                    occ_4mo_y: sql<string>`CONCAT(COALESCE(ROUND((e.used_4mo_y / e.amount_port_4mo_y - 1) * 100, 2), 0), '%')`.as('occ_4mo_y'),
+                    occ_gt_6mo_y: sql<string>`CONCAT(COALESCE(ROUND((e.used_gt_6mo_y / e.amount_port_gt_6mo_y - 1) * 100, 2), 0), '%')`.as('occ_gt_6mo_y'),
+                    occ_all_mo_y: sql<string>`CONCAT(COALESCE(ROUND((e.used_all_mo_y / e.amount_port_all_mo_y - 1) * 100, 2), 0), '%')`.as('occ_all_mo_y'),
+
+                    occ_1mo_y1: sql<string>`CONCAT(COALESCE(ROUND((e.used_1mo_y1 / e.amount_port_1mo_y1 - 1) * 100, 2), 0), '%')`.as('occ_1mo_y'),
+                    occ_2mo_y1: sql<string>`CONCAT(COALESCE(ROUND((e.used_2mo_y1 / e.amount_port_2mo_y1 - 1) * 100, 2), 0), '%')`.as('occ_2mo_y'),
+                    occ_3mo_y1: sql<string>`CONCAT(COALESCE(ROUND((e.used_3mo_y1 / e.amount_port_3mo_y1 - 1) * 100, 2), 0), '%')`.as('occ_3mo_y'),
+                    occ_4mo_y1: sql<string>`CONCAT(COALESCE(ROUND((e.used_4mo_y1 / e.amount_port_4mo_y1 - 1) * 100, 2), 0), '%')`.as('occ_4mo_y'),
+                    occ_gt_6mo_y1: sql<string>`CONCAT(COALESCE(ROUND((e.used_gt_6mo_y1 / e.amount_port_gt_6mo_y1 - 1) * 100, 2), 0), '%')`.as('occ_gt_6mo_y'),
+                    occ_all_mo_y1: sql<string>`CONCAT(COALESCE(ROUND((e.used_all_mo_y1 / e.amount_port_all_mo_y1 - 1) * 100, 2), 0), '%')`.as('occ_all_mo_y'),
+                })
+                .from(regionalTerritory)
+                .leftJoin(regionalOdp, eq(regionalTerritory.regional, regionalOdp.regional))
+                .leftJoin(regionalGolive, eq(regionalTerritory.regional, regionalGolive.regional))
+                .leftJoin(regionalDemands, eq(regionalTerritory.regional, regionalDemands.regional))
+                .leftJoin(regionalGolivePort, eq(regionalTerritory.regional, regionalGolivePort.regional))
+                .leftJoin(regionalTargetDemands, eq(regionalTerritory.regional, regionalTargetDemands.regional))
+                .groupBy(regionalTerritory.regional)
+
+            const [finalDataRevenue] = await Promise.all([
+                regionalFinalQuery
+            ])
+
+            return c.json({ data: finalDataRevenue })
+        })
     .get('/sf-class', zValidator('query', z.object({ date: z.string().optional(), branch: z.string().optional(), wok: z.string().optional() })),
         async c => {
             const { date, branch, wok } = c.req.valid('query')
@@ -2613,8 +2862,6 @@ const app = new Hono()
             const lastDayOfSelectedMonth = endOfMonth(selectedDate);
             const isEndOfMonth = selectedDate.getDate() === lastDayOfSelectedMonth.getDate();
 
-            const ihC3mr = dynamicIhC3mr(currYear, currMonth)
-
             const endOfCurrMonth = isEndOfMonth ? lastDayOfSelectedMonth : selectedDate;
             const endOfPrevMonth = isEndOfMonth ? endOfMonth(subMonths(selectedDate, 1)) : subMonths(selectedDate, 1);
             const endOfPrevYearSameMonth = isEndOfMonth ? endOfMonth(subYears(selectedDate, 1)) : subYears(selectedDate, 1);
@@ -2624,8 +2871,6 @@ const app = new Hono()
             const prevDate = format(endOfPrevMonth, 'yyyy-MM-dd');
             const prevYearCurrDate = format(endOfPrevYearSameMonth, 'yyyy-MM-dd');
             const yyyyMM = format(selectedDate, 'yyyyMM')
-            const daysInMonth = getDaysInMonth(selectedDate)
-            const today = Number(format(selectedDate, 'd'))
 
             const branchTerritory = db
                 .select({
@@ -2744,5 +2989,677 @@ const app = new Hono()
 
             return c.json({ data: finalDataRevenue })
         })
+    .get('/consolidation-all', zValidator('query', z.object({ date: z.string().optional(), branch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })), async c => {
+        const { date, branch, cluster, kabupaten } = c.req.valid('query')
+        const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
+
+        const currMonth = format(selectedDate, 'MM')
+        const currYear = format(selectedDate, 'yyyy')
+        const endOfCurrMonth = endOfMonth(selectedDate);
+        console.log({ selectedDate: format(endOfCurrMonth, 'yyyy-MM-dd') });
+
+        const daysInMonth = getDaysInMonth(selectedDate)
+        const today = Number(format(selectedDate, 'd'))
+
+        const branchTerritory = db
+            .select({
+                branch: territoryArea4.branch
+            })
+            .from(territoryArea4)
+            .where(branch ? eq(territoryArea4.branch, branch) : eq(territoryArea4.regional, 'PUMA'))
+            .groupBy(sql`1`)
+            .as('a')
+
+        const branchRevenue = db
+            .select()
+            .from(summaryAllConsolidationBranch)
+            .where(eq(summaryAllConsolidationBranch.tgl, format(endOfCurrMonth, 'yyyy-MM-dd')))
+            .groupBy(summaryAllConsolidationBranch.branch)
+            .as('b')
+
+        const summaryBranch = db
+            .select({
+                territory: branchTerritory.branch,
+                rev_all_m: sum(branchRevenue.rev_all_m).as('rev_all_m'),
+                rev_all_m1: sum(branchRevenue.rev_all_m1).as('rev_all_m1'),
+                rev_all_mom: branchRevenue.rev_all_mom,
+                rev_all_y: sum(branchRevenue.rev_all_y).as('rev_all_y'),
+                rev_all_y1: sum(branchRevenue.rev_all_y1).as('rev_all_y1'),
+                rev_all_ytd: branchRevenue.rev_all_ytd,
+                rev_fix_m: sum(branchRevenue.rev_fix_m).as('rev_fix_m'),
+                rev_fix_m1: sum(branchRevenue.rev_fix_m1).as('rev_fix_m1'),
+                rev_fix_mom: branchRevenue.rev_fix_mom,
+                rev_fix_y: sum(branchRevenue.rev_fix_y).as("rev_fix_y"),
+                rev_fix_y1: sum(branchRevenue.rev_fix_y1).as("rev_fix_y1"),
+                rev_fix_ytd: branchRevenue.rev_fix_ytd,
+                cons_m: sum(branchRevenue.consolidation_m).as('consolidation_m'),
+                cons_m1: sum(branchRevenue.consolidation_m1).as('consolidation_m1'),
+                cons_mom: branchRevenue.consolidation_mom,
+                cons_y: sum(branchRevenue.consolidation_y).as('consolidation_y'),
+                cons_y1: sum(branchRevenue.consolidation_y1).as('consolidation_y1'),
+                cons_ytd: branchRevenue.consolidation_ytd
+            })
+            .from(branchTerritory)
+            .leftJoin(branchRevenue, eq(branchTerritory.branch, branchRevenue.branch))
+            .groupBy(sql`1`)
+
+        const clusterHeader = db
+            .selectDistinct({
+                territory: sql<string>`'CLUSTER'`.as('territory'),
+                rev_all_m: sql<string>`''`.as('rev_all_m'),
+                rev_all_m1: sql<string>`''`.as('rev_all_m1'),
+                rev_all_mom: sql<string>`''`.as('rev_all_mom'),
+                rev_all_y: sql<string>`''`.as('rev_all_y'),
+                rev_all_y1: sql<string>`''`.as('rev_all_y1'),
+                rev_all_ytd: sql<string>`''`.as('rev_all_ytd'),
+                rev_fix_m: sql<string>`''`.as('rev_fix_m'),
+                rev_fix_m1: sql<string>`''`.as('rev_fix_m1'),
+                rev_fix_mom: sql<string>`''`.as('rev_fix_mom'),
+                rev_fix_y: sql<string>`''`.as('rev_fix_y'),
+                rev_fix_y1: sql<string>`''`.as('rev_fix_y1'),
+                rev_fix_ytd: sql<string>`''`.as('rev_fix_ytd'),
+                cons_m: sql<string>`''`.as('cons_m'),
+                cons_m1: sql<string>`''`.as('cons_m1'),
+                cons_mom: sql<string>`''`.as('cons_mom'),
+                cons_y: sql<string>`''`.as('cons_y'),
+                cons_y1: sql<string>`''`.as('cons_y1'),
+                cons_ytd: sql<string>`''`.as('cons_ytd')
+            })
+            .from(territoryArea4)
+
+        const clusterTerritory = db
+            .select({
+                cluster: territoryArea4.cluster
+            })
+            .from(territoryArea4)
+            .where(branch && cluster ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.cluster, cluster),
+                eq(territoryArea4.branch, branch)
+            ) : branch ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.branch, branch)
+            ) : eq(territoryArea4.regional, 'PUMA'))
+            .groupBy(sql`1`)
+            .as('a')
+
+        const clusterRevenue = db
+            .select()
+            .from(summaryAllConsolidationCluster)
+            .where(eq(summaryAllConsolidationCluster.tgl, format(endOfCurrMonth, 'yyyy-MM-dd')))
+            .groupBy(summaryAllConsolidationCluster.cluster)
+            .as('b')
+
+        const summaryCluster = db
+            .select({
+                territory: clusterTerritory.cluster,
+                rev_all_m: sum(clusterRevenue.rev_all_m).as('rev_all_m'),
+                rev_all_m1: sum(clusterRevenue.rev_all_m1).as('rev_all_m1'),
+                rev_all_mom: clusterRevenue.rev_all_mom,
+                rev_all_y: sum(clusterRevenue.rev_all_y).as('rev_all_y'),
+                rev_all_y1: sum(clusterRevenue.rev_all_y1).as('rev_all_y1'),
+                rev_all_ytd: clusterRevenue.rev_all_ytd,
+                rev_fix_m: sum(clusterRevenue.rev_fix_m).as('rev_fix_m'),
+                rev_fix_m1: sum(clusterRevenue.rev_fix_m1).as('rev_fix_m1'),
+                rev_fix_mom: clusterRevenue.rev_fix_mom,
+                rev_fix_y: sum(clusterRevenue.rev_fix_y).as("rev_fix_y"),
+                rev_fix_y1: sum(clusterRevenue.rev_fix_y1).as("rev_fix_y1"),
+                rev_fix_ytd: clusterRevenue.rev_fix_ytd,
+                cons_m: sum(clusterRevenue.consolidation_m).as('consolidation_m'),
+                cons_m1: sum(clusterRevenue.consolidation_m1).as('consolidation_m1'),
+                cons_mom: clusterRevenue.consolidation_mom,
+                cons_y: sum(clusterRevenue.consolidation_y).as('consolidation_y'),
+                cons_y1: sum(clusterRevenue.consolidation_y1).as('consolidation_y1'),
+                cons_ytd: clusterRevenue.consolidation_ytd
+            })
+            .from(clusterTerritory)
+            .leftJoin(clusterRevenue, eq(clusterTerritory.cluster, clusterRevenue.cluster))
+            .groupBy(sql`1`)
+
+        const kabupatenHeader = db
+            .selectDistinct({
+                territory: sql<string>`'KABUPATEN'`.as('territory'),
+                rev_all_m: sql<string>`''`.as('rev_all_m'),
+                rev_all_m1: sql<string>`''`.as('rev_all_m1'),
+                rev_all_mom: sql<string>`''`.as('rev_all_mom'),
+                rev_all_y: sql<string>`''`.as('rev_all_y'),
+                rev_all_y1: sql<string>`''`.as('rev_all_y1'),
+                rev_all_ytd: sql<string>`''`.as('rev_all_ytd'),
+                rev_fix_m: sql<string>`''`.as('rev_fix_m'),
+                rev_fix_m1: sql<string>`''`.as('rev_fix_m1'),
+                rev_fix_mom: sql<string>`''`.as('rev_fix_mom'),
+                rev_fix_y: sql<string>`''`.as('rev_fix_y'),
+                rev_fix_y1: sql<string>`''`.as('rev_fix_y1'),
+                rev_fix_ytd: sql<string>`''`.as('rev_fix_ytd'),
+                cons_m: sql<string>`''`.as('cons_m'),
+                cons_m1: sql<string>`''`.as('cons_m1'),
+                cons_mom: sql<string>`''`.as('cons_mom'),
+                cons_y: sql<string>`''`.as('cons_y'),
+                cons_y1: sql<string>`''`.as('cons_y1'),
+                cons_ytd: sql<string>`''`.as('cons_ytd')
+            })
+            .from(territoryArea4)
+
+        const kabupatenTerritory = db
+            .select({
+                kabupaten: territoryArea4.kabupaten
+            })
+            .from(territoryArea4)
+            .where(branch && cluster && kabupaten ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.branch, branch),
+                eq(territoryArea4.cluster, cluster),
+                eq(territoryArea4.kabupaten, kabupaten)
+            ) : branch && cluster ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.cluster, cluster),
+                eq(territoryArea4.branch, branch)
+            ) : branch ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.branch, branch)
+            ) : eq(territoryArea4.regional, 'PUMA'))
+            .groupBy(sql`1`)
+            .as('a')
+
+        const kabupatenRevenue = db
+            .select()
+            .from(summaryAllConsolidationKabupaten)
+            .where(eq(summaryAllConsolidationKabupaten.tgl, format(endOfCurrMonth, 'yyyy-MM-dd')))
+            .groupBy(summaryAllConsolidationKabupaten.kabupaten)
+            .as('b')
+
+        const summaryKabupaten = db
+            .select({
+                territory: kabupatenTerritory.kabupaten,
+                rev_all_m: sum(kabupatenRevenue.rev_all_m).as('rev_all_m'),
+                rev_all_m1: sum(kabupatenRevenue.rev_all_m1).as('rev_all_m1'),
+                rev_all_mom: kabupatenRevenue.rev_all_mom,
+                rev_all_y: sum(kabupatenRevenue.rev_all_y).as('rev_all_y'),
+                rev_all_y1: sum(kabupatenRevenue.rev_all_y1).as('rev_all_y1'),
+                rev_all_ytd: kabupatenRevenue.rev_all_ytd,
+                rev_fix_m: sum(kabupatenRevenue.rev_fix_m).as('rev_fix_m'),
+                rev_fix_m1: sum(kabupatenRevenue.rev_fix_m1).as('rev_fix_m1'),
+                rev_fix_mom: kabupatenRevenue.rev_fix_mom,
+                rev_fix_y: sum(kabupatenRevenue.rev_fix_y).as("rev_fix_y"),
+                rev_fix_y1: sum(kabupatenRevenue.rev_fix_y1).as("rev_fix_y1"),
+                rev_fix_ytd: kabupatenRevenue.rev_fix_ytd,
+                cons_m: sum(kabupatenRevenue.consolidation_m).as('consolidation_m'),
+                cons_m1: sum(kabupatenRevenue.consolidation_m1).as('consolidation_m1'),
+                cons_mom: kabupatenRevenue.consolidation_mom,
+                cons_y: sum(kabupatenRevenue.consolidation_y).as('consolidation_y'),
+                cons_y1: sum(kabupatenRevenue.consolidation_y1).as('consolidation_y1'),
+                cons_ytd: kabupatenRevenue.consolidation_ytd
+            })
+            .from(kabupatenTerritory)
+            .leftJoin(kabupatenRevenue, eq(kabupatenTerritory.kabupaten, kabupatenRevenue.kabupaten))
+            .groupBy(sql`1`)
+
+        const [finalDataRevenue] = await Promise.all([
+            unionAll(summaryBranch, clusterHeader, summaryCluster, kabupatenHeader, summaryKabupaten)
+        ])
+
+        return c.json({ data: finalDataRevenue }, 200)
+    })
+    .get('/consolidation-bb', zValidator('query', z.object({ date: z.string().optional(), branch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })), async c => {
+        const { date, branch, cluster, kabupaten } = c.req.valid('query')
+        const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
+
+        const currMonth = format(selectedDate, 'MM')
+        const currYear = format(selectedDate, 'yyyy')
+        const endOfCurrMonth = endOfMonth(selectedDate);
+        console.log({ selectedDate: format(endOfCurrMonth, 'yyyy-MM-dd') });
+
+        const branchTerritory = db
+            .select({
+                branch: territoryArea4.branch
+            })
+            .from(territoryArea4)
+            .where(branch ? eq(territoryArea4.branch, branch) : eq(territoryArea4.regional, 'PUMA'))
+            .groupBy(sql`1`)
+            .as('a')
+
+        const branchRevenue = db
+            .select()
+            .from(summaryBBConsolidationBranch)
+            .where(eq(summaryBBConsolidationBranch.tgl, format(endOfCurrMonth, 'yyyy-MM-dd')))
+            .groupBy(summaryBBConsolidationBranch.branch)
+            .as('b')
+
+        const summaryBranch = db
+            .select({
+                territory: branchTerritory.branch,
+                rev_bb_m: sum(branchRevenue.rev_bb_m).as('rev_bb_m'),
+                rev_bb_m1: sum(branchRevenue.rev_bb_m1).as('rev_bb_m1'),
+                rev_bb_mom: branchRevenue.rev_bb_mom,
+                rev_bb_y: sum(branchRevenue.rev_bb_y).as('rev_bb_y'),
+                rev_bb_y1: sum(branchRevenue.rev_bb_y1).as('rev_bb_y1'),
+                rev_bb_ytd: branchRevenue.rev_bb_ytd,
+                rev_fix_m: sum(branchRevenue.rev_fix_m).as('rev_fix_m'),
+                rev_fix_m1: sum(branchRevenue.rev_fix_m1).as('rev_fix_m1'),
+                rev_fix_mom: branchRevenue.rev_fix_mom,
+                rev_fix_y: sum(branchRevenue.rev_fix_y).as("rev_fix_y"),
+                rev_fix_y1: sum(branchRevenue.rev_fix_y1).as("rev_fix_y1"),
+                rev_fix_ytd: branchRevenue.rev_fix_ytd,
+                cons_m: sum(branchRevenue.consolidation_m).as('consolidation_m'),
+                cons_m1: sum(branchRevenue.consolidation_m1).as('consolidation_m1'),
+                cons_mom: branchRevenue.consolidation_mom,
+                cons_y: sum(branchRevenue.consolidation_y).as('consolidation_y'),
+                cons_y1: sum(branchRevenue.consolidation_y1).as('consolidation_y1'),
+                cons_ytd: branchRevenue.consolidation_ytd
+            })
+            .from(branchTerritory)
+            .leftJoin(branchRevenue, eq(branchTerritory.branch, branchRevenue.branch))
+            .groupBy(sql`1`)
+
+        const clusterHeader = db
+            .selectDistinct({
+                territory: sql<string>`'CLUSTER'`.as('territory'),
+                rev_bb_m: sql<string>`''`.as('rev_bb_m'),
+                rev_bb_m1: sql<string>`''`.as('rev_bb_m1'),
+                rev_bb_mom: sql<string>`''`.as('rev_bb_mom'),
+                rev_bb_y: sql<string>`''`.as('rev_bb_y'),
+                rev_bb_y1: sql<string>`''`.as('rev_bb_y1'),
+                rev_bb_ytd: sql<string>`''`.as('rev_bb_ytd'),
+                rev_fix_m: sql<string>`''`.as('rev_fix_m'),
+                rev_fix_m1: sql<string>`''`.as('rev_fix_m1'),
+                rev_fix_mom: sql<string>`''`.as('rev_fix_mom'),
+                rev_fix_y: sql<string>`''`.as('rev_fix_y'),
+                rev_fix_y1: sql<string>`''`.as('rev_fix_y1'),
+                rev_fix_ytd: sql<string>`''`.as('rev_fix_ytd'),
+                cons_m: sql<string>`''`.as('cons_m'),
+                cons_m1: sql<string>`''`.as('cons_m1'),
+                cons_mom: sql<string>`''`.as('cons_mom'),
+                cons_y: sql<string>`''`.as('cons_y'),
+                cons_y1: sql<string>`''`.as('cons_y1'),
+                cons_ytd: sql<string>`''`.as('cons_ytd')
+            })
+            .from(territoryArea4)
+
+        const clusterTerritory = db
+            .select({
+                cluster: territoryArea4.cluster
+            })
+            .from(territoryArea4)
+            .where(branch && cluster ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.cluster, cluster),
+                eq(territoryArea4.branch, branch)
+            ) : branch ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.branch, branch)
+            ) : eq(territoryArea4.regional, 'PUMA'))
+            .groupBy(sql`1`)
+            .as('a')
+
+        const clusterRevenue = db
+            .select()
+            .from(summaryBBConsolidationCluster)
+            .where(eq(summaryBBConsolidationCluster.tgl, format(endOfCurrMonth, 'yyyy-MM-dd')))
+            .groupBy(summaryBBConsolidationCluster.cluster)
+            .as('b')
+
+        const summaryCluster = db
+            .select({
+                territory: clusterTerritory.cluster,
+                rev_bb_m: sum(clusterRevenue.rev_bb_m).as('rev_bb_m'),
+                rev_bb_m1: sum(clusterRevenue.rev_bb_m1).as('rev_bb_m1'),
+                rev_bb_mom: clusterRevenue.rev_bb_mom,
+                rev_bb_y: sum(clusterRevenue.rev_bb_y).as('rev_bb_y'),
+                rev_bb_y1: sum(clusterRevenue.rev_bb_y1).as('rev_bb_y1'),
+                rev_bb_ytd: clusterRevenue.rev_bb_ytd,
+                rev_fix_m: sum(clusterRevenue.rev_fix_m).as('rev_fix_m'),
+                rev_fix_m1: sum(clusterRevenue.rev_fix_m1).as('rev_fix_m1'),
+                rev_fix_mom: clusterRevenue.rev_fix_mom,
+                rev_fix_y: sum(clusterRevenue.rev_fix_y).as("rev_fix_y"),
+                rev_fix_y1: sum(clusterRevenue.rev_fix_y1).as("rev_fix_y1"),
+                rev_fix_ytd: clusterRevenue.rev_fix_ytd,
+                cons_m: sum(clusterRevenue.consolidation_m).as('consolidation_m'),
+                cons_m1: sum(clusterRevenue.consolidation_m1).as('consolidation_m1'),
+                cons_mom: clusterRevenue.consolidation_mom,
+                cons_y: sum(clusterRevenue.consolidation_y).as('consolidation_y'),
+                cons_y1: sum(clusterRevenue.consolidation_y1).as('consolidation_y1'),
+                cons_ytd: clusterRevenue.consolidation_ytd
+            })
+            .from(clusterTerritory)
+            .leftJoin(clusterRevenue, eq(clusterTerritory.cluster, clusterRevenue.cluster))
+            .groupBy(sql`1`)
+
+        const kabupatenHeader = db
+            .selectDistinct({
+                territory: sql<string>`'KABUPATEN'`.as('territory'),
+                rev_bb_m: sql<string>`''`.as('rev_bb_m'),
+                rev_bb_m1: sql<string>`''`.as('rev_bb_m1'),
+                rev_bb_mom: sql<string>`''`.as('rev_bb_mom'),
+                rev_bb_y: sql<string>`''`.as('rev_bb_y'),
+                rev_bb_y1: sql<string>`''`.as('rev_bb_y1'),
+                rev_bb_ytd: sql<string>`''`.as('rev_bb_ytd'),
+                rev_fix_m: sql<string>`''`.as('rev_fix_m'),
+                rev_fix_m1: sql<string>`''`.as('rev_fix_m1'),
+                rev_fix_mom: sql<string>`''`.as('rev_fix_mom'),
+                rev_fix_y: sql<string>`''`.as('rev_fix_y'),
+                rev_fix_y1: sql<string>`''`.as('rev_fix_y1'),
+                rev_fix_ytd: sql<string>`''`.as('rev_fix_ytd'),
+                cons_m: sql<string>`''`.as('cons_m'),
+                cons_m1: sql<string>`''`.as('cons_m1'),
+                cons_mom: sql<string>`''`.as('cons_mom'),
+                cons_y: sql<string>`''`.as('cons_y'),
+                cons_y1: sql<string>`''`.as('cons_y1'),
+                cons_ytd: sql<string>`''`.as('cons_ytd')
+            })
+            .from(territoryArea4)
+
+        const kabupatenTerritory = db
+            .select({
+                kabupaten: territoryArea4.kabupaten
+            })
+            .from(territoryArea4)
+            .where(branch && cluster && kabupaten ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.branch, branch),
+                eq(territoryArea4.cluster, cluster),
+                eq(territoryArea4.kabupaten, kabupaten)
+            ) : branch && cluster ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.cluster, cluster),
+                eq(territoryArea4.branch, branch)
+            ) : branch ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.branch, branch)
+            ) : eq(territoryArea4.regional, 'PUMA'))
+            .groupBy(sql`1`)
+            .as('a')
+
+        const kabupatenRevenue = db
+            .select()
+            .from(summaryBBConsolidationKabupaten)
+            .where(eq(summaryBBConsolidationKabupaten.tgl, format(endOfCurrMonth, 'yyyy-MM-dd')))
+            .groupBy(summaryBBConsolidationKabupaten.kabupaten)
+            .as('b')
+
+        const summaryKabupaten = db
+            .select({
+                territory: kabupatenTerritory.kabupaten,
+                rev_bb_m: sum(kabupatenRevenue.rev_bb_m).as('rev_bb_m'),
+                rev_bb_m1: sum(kabupatenRevenue.rev_bb_m1).as('rev_bb_m1'),
+                rev_bb_mom: kabupatenRevenue.rev_bb_mom,
+                rev_bb_y: sum(kabupatenRevenue.rev_bb_y).as('rev_bb_y'),
+                rev_bb_y1: sum(kabupatenRevenue.rev_bb_y1).as('rev_bb_y1'),
+                rev_bb_ytd: kabupatenRevenue.rev_bb_ytd,
+                rev_fix_m: sum(kabupatenRevenue.rev_fix_m).as('rev_fix_m'),
+                rev_fix_m1: sum(kabupatenRevenue.rev_fix_m1).as('rev_fix_m1'),
+                rev_fix_mom: kabupatenRevenue.rev_fix_mom,
+                rev_fix_y: sum(kabupatenRevenue.rev_fix_y).as("rev_fix_y"),
+                rev_fix_y1: sum(kabupatenRevenue.rev_fix_y1).as("rev_fix_y1"),
+                rev_fix_ytd: kabupatenRevenue.rev_fix_ytd,
+                cons_m: sum(kabupatenRevenue.consolidation_m).as('consolidation_m'),
+                cons_m1: sum(kabupatenRevenue.consolidation_m1).as('consolidation_m1'),
+                cons_mom: kabupatenRevenue.consolidation_mom,
+                cons_y: sum(kabupatenRevenue.consolidation_y).as('consolidation_y'),
+                cons_y1: sum(kabupatenRevenue.consolidation_y1).as('consolidation_y1'),
+                cons_ytd: kabupatenRevenue.consolidation_ytd
+            })
+            .from(kabupatenTerritory)
+            .leftJoin(kabupatenRevenue, eq(kabupatenTerritory.kabupaten, kabupatenRevenue.kabupaten))
+            .groupBy(sql`1`)
+
+        const [finalDataRevenue] = await Promise.all([
+            unionAll(summaryBranch, clusterHeader, summaryCluster, kabupatenHeader, summaryKabupaten)
+        ])
+
+        return c.json({ data: finalDataRevenue }, 200)
+    })
+    .get('/consolidation-payload', zValidator('query', z.object({ date: z.string().optional(), branch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })), async c => {
+        const { date, branch, cluster, kabupaten } = c.req.valid('query')
+        const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
+
+        const currMonth = format(selectedDate, 'MM')
+        const currYear = format(selectedDate, 'yyyy')
+        const endOfCurrMonth = endOfMonth(selectedDate);
+        console.log({ selectedDate: format(endOfCurrMonth, 'yyyy-MM-dd') });
+
+        const branchTerritory = db
+            .select({
+                branch: territoryArea4.branch
+            })
+            .from(territoryArea4)
+            .where(branch ? eq(territoryArea4.branch, branch) : eq(territoryArea4.regional, 'PUMA'))
+            .groupBy(sql`1`)
+            .as('a')
+
+        const branchRevenue = db
+            .select()
+            .from(summaryPayloadConsolidationBranch)
+            .where(eq(summaryPayloadConsolidationBranch.tgl, format(endOfCurrMonth, 'yyyy-MM-dd')))
+            .groupBy(summaryPayloadConsolidationBranch.branch)
+            .as('b')
+
+        const summaryBranch = db
+            .select({
+                territory: branchTerritory.branch,
+                payload_mobile_m: sum(branchRevenue.payload_mobile_m).as('payload_mobile_m'),
+                payload_mobile_m1: sum(branchRevenue.payload_mobile_m1).as('payload_mobile_m1'),
+                payload_mobile_mom: branchRevenue.payload_mobile_mom,
+                payload_mobile_y: sum(branchRevenue.payload_mobile_y).as('payload_mobile_y'),
+                payload_mobile_y1: sum(branchRevenue.payload_mobile_y1).as('payload_mobile_y1'),
+                payload_mobile_ytd: branchRevenue.payload_mobile_ytd,
+                payload_fix_m: sum(branchRevenue.payload_fix_m).as('payload_fix_m'),
+                payload_fix_m1: sum(branchRevenue.payload_fix_m1).as('payload_fix_m1'),
+                payload_fix_mom: branchRevenue.payload_fix_mom,
+                payload_fix_y: sum(branchRevenue.payload_fix_y).as("payload_fix_y"),
+                payload_fix_y1: sum(branchRevenue.payload_fix_y1).as("payload_fix_y1"),
+                payload_fix_ytd: branchRevenue.payload_fix_ytd,
+                cons_m: sum(branchRevenue.consolidation_m).as('consolidation_m'),
+                cons_m1: sum(branchRevenue.consolidation_m1).as('consolidation_m1'),
+                cons_mom: branchRevenue.consolidation_mom,
+                cons_y: sum(branchRevenue.consolidation_y).as('consolidation_y'),
+                cons_y1: sum(branchRevenue.consolidation_y1).as('consolidation_y1'),
+                cons_ytd: branchRevenue.consolidation_ytd
+            })
+            .from(branchTerritory)
+            .leftJoin(branchRevenue, eq(branchTerritory.branch, branchRevenue.branch))
+            .groupBy(sql`1`)
+
+        const clusterHeader = db
+            .selectDistinct({
+                territory: sql<string>`'CLUSTER'`.as('territory'),
+                payload_mobile_m: sql<string>`''`.as('payload_mobile_m'),
+                payload_mobile_m1: sql<string>`''`.as('payload_mobile_m1'),
+                payload_mobile_mom: sql<string>`''`.as('payload_mobile_mom'),
+                payload_mobile_y: sql<string>`''`.as('payload_mobile_y'),
+                payload_mobile_y1: sql<string>`''`.as('payload_mobile_y1'),
+                payload_mobile_ytd: sql<string>`''`.as('payload_mobile_ytd'),
+                payload_fix_m: sql<string>`''`.as('payload_fix_m'),
+                payload_fix_m1: sql<string>`''`.as('payload_fix_m1'),
+                payload_fix_mom: sql<string>`''`.as('payload_fix_mom'),
+                payload_fix_y: sql<string>`''`.as('payload_fix_y'),
+                payload_fix_y1: sql<string>`''`.as('payload_fix_y1'),
+                payload_fix_ytd: sql<string>`''`.as('payload_fix_ytd'),
+                cons_m: sql<string>`''`.as('cons_m'),
+                cons_m1: sql<string>`''`.as('cons_m1'),
+                cons_mom: sql<string>`''`.as('cons_mom'),
+                cons_y: sql<string>`''`.as('cons_y'),
+                cons_y1: sql<string>`''`.as('cons_y1'),
+                cons_ytd: sql<string>`''`.as('cons_ytd')
+            })
+            .from(territoryArea4)
+
+        const clusterTerritory = db
+            .select({
+                cluster: territoryArea4.cluster
+            })
+            .from(territoryArea4)
+            .where(branch && cluster ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.cluster, cluster),
+                eq(territoryArea4.branch, branch)
+            ) : branch ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.branch, branch)
+            ) : eq(territoryArea4.regional, 'PUMA'))
+            .groupBy(sql`1`)
+            .as('a')
+
+        const clusterRevenue = db
+            .select()
+            .from(summaryPayloadConsolidationCluster)
+            .where(eq(summaryPayloadConsolidationCluster.tgl, format(endOfCurrMonth, 'yyyy-MM-dd')))
+            .groupBy(summaryPayloadConsolidationCluster.cluster)
+            .as('b')
+
+        const summaryCluster = db
+            .select({
+                territory: clusterTerritory.cluster,
+                payload_mobile_m: sum(clusterRevenue.payload_mobile_m).as('payload_mobile_m'),
+                payload_mobile_m1: sum(clusterRevenue.payload_mobile_m1).as('payload_mobile_m1'),
+                payload_mobile_mom: clusterRevenue.payload_mobile_mom,
+                payload_mobile_y: sum(clusterRevenue.payload_mobile_y).as('payload_mobile_y'),
+                payload_mobile_y1: sum(clusterRevenue.payload_mobile_y1).as('payload_mobile_y1'),
+                payload_mobile_ytd: clusterRevenue.payload_mobile_ytd,
+                payload_fix_m: sum(clusterRevenue.payload_fix_m).as('payload_fix_m'),
+                payload_fix_m1: sum(clusterRevenue.payload_fix_m1).as('payload_fix_m1'),
+                payload_fix_mom: clusterRevenue.payload_fix_mom,
+                payload_fix_y: sum(clusterRevenue.payload_fix_y).as("payload_fix_y"),
+                payload_fix_y1: sum(clusterRevenue.payload_fix_y1).as("payload_fix_y1"),
+                payload_fix_ytd: clusterRevenue.payload_fix_ytd,
+                cons_m: sum(clusterRevenue.consolidation_m).as('consolidation_m'),
+                cons_m1: sum(clusterRevenue.consolidation_m1).as('consolidation_m1'),
+                cons_mom: clusterRevenue.consolidation_mom,
+                cons_y: sum(clusterRevenue.consolidation_y).as('consolidation_y'),
+                cons_y1: sum(clusterRevenue.consolidation_y1).as('consolidation_y1'),
+                cons_ytd: clusterRevenue.consolidation_ytd
+            })
+            .from(clusterTerritory)
+            .leftJoin(clusterRevenue, eq(clusterTerritory.cluster, clusterRevenue.cluster))
+            .groupBy(sql`1`)
+
+        const kabupatenHeader = db
+            .selectDistinct({
+                territory: sql<string>`'KABUPATEN'`.as('territory'),
+                payload_mobile_m: sql<string>`''`.as('payload_mobile_m'),
+                payload_mobile_m1: sql<string>`''`.as('payload_mobile_m1'),
+                payload_mobile_mom: sql<string>`''`.as('payload_mobile_mom'),
+                payload_mobile_y: sql<string>`''`.as('payload_mobile_y'),
+                payload_mobile_y1: sql<string>`''`.as('payload_mobile_y1'),
+                payload_mobile_ytd: sql<string>`''`.as('payload_mobile_ytd'),
+                payload_fix_m: sql<string>`''`.as('payload_fix_m'),
+                payload_fix_m1: sql<string>`''`.as('payload_fix_m1'),
+                payload_fix_mom: sql<string>`''`.as('payload_fix_mom'),
+                payload_fix_y: sql<string>`''`.as('payload_fix_y'),
+                payload_fix_y1: sql<string>`''`.as('payload_fix_y1'),
+                payload_fix_ytd: sql<string>`''`.as('payload_fix_ytd'),
+                cons_m: sql<string>`''`.as('cons_m'),
+                cons_m1: sql<string>`''`.as('cons_m1'),
+                cons_mom: sql<string>`''`.as('cons_mom'),
+                cons_y: sql<string>`''`.as('cons_y'),
+                cons_y1: sql<string>`''`.as('cons_y1'),
+                cons_ytd: sql<string>`''`.as('cons_ytd')
+            })
+            .from(territoryArea4)
+
+        const kabupatenTerritory = db
+            .select({
+                kabupaten: territoryArea4.kabupaten
+            })
+            .from(territoryArea4)
+            .where(branch && cluster && kabupaten ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.branch, branch),
+                eq(territoryArea4.cluster, cluster),
+                eq(territoryArea4.kabupaten, kabupaten)
+            ) : branch && cluster ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.cluster, cluster),
+                eq(territoryArea4.branch, branch)
+            ) : branch ? and(
+                eq(territoryArea4.regional, 'PUMA'),
+                eq(territoryArea4.branch, branch)
+            ) : eq(territoryArea4.regional, 'PUMA'))
+            .groupBy(sql`1`)
+            .as('a')
+
+        const kabupatenRevenue = db
+            .select()
+            .from(summaryPayloadConsolidationKabupaten)
+            .where(eq(summaryPayloadConsolidationKabupaten.tgl, format(endOfCurrMonth, 'yyyy-MM-dd')))
+            .groupBy(summaryPayloadConsolidationKabupaten.kabupaten)
+            .as('b')
+
+        const summaryKabupaten = db
+            .select({
+                territory: kabupatenTerritory.kabupaten,
+                payload_mobile_m: sum(kabupatenRevenue.payload_mobile_m).as('payload_mobile_m'),
+                payload_mobile_m1: sum(kabupatenRevenue.payload_mobile_m1).as('payload_mobile_m1'),
+                payload_mobile_mom: kabupatenRevenue.payload_mobile_mom,
+                payload_mobile_y: sum(kabupatenRevenue.payload_mobile_y).as('payload_mobile_y'),
+                payload_mobile_y1: sum(kabupatenRevenue.payload_mobile_y1).as('payload_mobile_y1'),
+                payload_mobile_ytd: kabupatenRevenue.payload_mobile_ytd,
+                payload_fix_m: sum(kabupatenRevenue.payload_fix_m).as('payload_fix_m'),
+                payload_fix_m1: sum(kabupatenRevenue.payload_fix_m1).as('payload_fix_m1'),
+                payload_fix_mom: kabupatenRevenue.payload_fix_mom,
+                payload_fix_y: sum(kabupatenRevenue.payload_fix_y).as("payload_fix_y"),
+                payload_fix_y1: sum(kabupatenRevenue.payload_fix_y1).as("payload_fix_y1"),
+                payload_fix_ytd: kabupatenRevenue.payload_fix_ytd,
+                cons_m: sum(kabupatenRevenue.consolidation_m).as('consolidation_m'),
+                cons_m1: sum(kabupatenRevenue.consolidation_m1).as('consolidation_m1'),
+                cons_mom: kabupatenRevenue.consolidation_mom,
+                cons_y: sum(kabupatenRevenue.consolidation_y).as('consolidation_y'),
+                cons_y1: sum(kabupatenRevenue.consolidation_y1).as('consolidation_y1'),
+                cons_ytd: kabupatenRevenue.consolidation_ytd
+            })
+            .from(kabupatenTerritory)
+            .leftJoin(kabupatenRevenue, eq(kabupatenTerritory.kabupaten, kabupatenRevenue.kabupaten))
+            .groupBy(sql`1`)
+
+        const [finalDataRevenue] = await Promise.all([
+            unionAll(summaryBranch, clusterHeader, summaryCluster, kabupatenHeader, summaryKabupaten)
+        ])
+
+        return c.json({ data: finalDataRevenue }, 200)
+    })
+    .get('/hh-max-dates', async c => {
+        const selectedDate = subDays(new Date(), 2)
+
+        const currMonth = format(selectedDate, 'MM')
+        const currYear = format(selectedDate, 'yyyy')
+        const lastDayOfSelectedMonth = endOfMonth(selectedDate);
+        const isEndOfMonth = selectedDate.getDate() === lastDayOfSelectedMonth.getDate();
+
+        const ihOrderingDetailOrder = dynamicIhOrderingDetailOrderTable(currYear, currMonth)
+
+        const branchTerritory = db
+            .selectDistinct({
+                branch: territoryArea4.branch
+            })
+            .from(territoryArea4)
+            .where(eq(territoryArea4.regional, 'PUMA'))
+            .as('branch_territory')
+
+        const orderingDate = db
+            .select({
+                branch: ihOrderingDetailOrder.branch,
+                ordering_max_date: sql<string>`MAX(event_date)`.as('ordering_max_date')
+            })
+            .from(ihOrderingDetailOrder)
+            .where(eq(ihOrderingDetailOrder.region, 'MALUKU DAN PAPUA'))
+            .groupBy(sql`1`)
+            .as('ihOrderingDetailOrder')
+
+        const allDates = db
+            .select({
+                cons_max_date: sql<string>`MAX(${summaryAllConsolidationBranch.tgl})`.as('cons_max_date'),
+                ioreps_max_date: sql<string>`MAX(${summaryIoRePsBranch.event_date})`.as('ioreps_max_date'),
+                ordering_max_date: sql<string>`${orderingDate.ordering_max_date}`.as('ordering_max_date')
+            })
+            .from(branchTerritory)
+            .leftJoin(summaryAllConsolidationBranch, eq(branchTerritory.branch, summaryAllConsolidationBranch.branch))
+            .leftJoin(summaryIoRePsBranch, eq(branchTerritory.branch, summaryIoRePsBranch.branch))
+            .leftJoin(orderingDate, eq(branchTerritory.branch, orderingDate.branch))
+
+        const [all] = await Promise.all([
+            allDates
+        ])
+
+        return c.json({ data: all }, 200)
+    })
 
 export default app

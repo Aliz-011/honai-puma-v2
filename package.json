@@ -55,6 +55,7 @@
     "@types/d3": "^7.4.3",
     "@types/file-saver": "^2.0.7",
     "@types/ldapjs": "^3.0.6",
+    "@types/next": "^9.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

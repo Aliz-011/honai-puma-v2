@@ -4,10 +4,9 @@ import { Hono } from "hono";
 import { unionAll } from "drizzle-orm/mysql-core";
 import { z } from "zod"
 
-import { dynamicRevenueRedeemPV, summaryPvConsumeRegional, summaryPvConsumeBranch, summaryPvConsumeSubbranch, summaryPvConsumeCluster, summaryPvConsumeKabupaten, summaryBbRegional, summaryBbBranch, summaryBbSubbranch, summaryBbCluster, summaryBbCity, feiTargetPuma } from "@/db/schema/v_honai_puma";
+import { summaryPvConsumeRegional, summaryPvConsumeBranch, summaryPvConsumeSubbranch, summaryPvConsumeCluster, summaryPvConsumeKabupaten, summaryBbRegional, summaryBbBranch, summaryBbSubbranch, summaryBbCluster, summaryBbCity, feiTargetPuma } from "@/db/schema/v_honai_puma";
 import { db } from "@/db";
 import { zValidator } from "@/lib/validator-wrapper";
-import { Regional } from "@/types";
 import { territoryArea4 } from "@/db/schema/puma_2025";
 
 

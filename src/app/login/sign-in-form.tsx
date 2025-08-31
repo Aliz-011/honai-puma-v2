@@ -1,6 +1,5 @@
 import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
-import { InferRequestType, InferResponseType } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,16 +16,18 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card"
-import { client } from "@/lib/client";
 
-type ResponseType = InferResponseType<typeof client.api.signin.$post>
-type RequestType = InferRequestType<typeof client.api.signin.$post>['json']
+type ResponseType = { message: string }
+const LoginSchema = z.object({
+	username: z.string().trim().min(1, 'Please enter your username'),
+	password: z.string().min(1, "Please enter your password"),
+})
 
 export default function SignInForm() {
 	const navigate = useRouter();
 	const queryClient = useQueryClient();
 
-	const mutation = useMutation<ResponseType, HTTPException, RequestType>({
+	const mutation = useMutation<ResponseType, HTTPException, z.infer<typeof LoginSchema>>({
 		mutationFn: async (values) => {
 			const response = await signIn('credentials', {
 				redirect: false,

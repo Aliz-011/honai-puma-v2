@@ -93,7 +93,7 @@ export function NavUser() {
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem className="cursor-pointer" onClick={() => navigate.push('/honai/account')}>
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => navigate.push('/puma/account')}>
                                 <UserCircleIcon />
                                 Account
                             </DropdownMenuItem>

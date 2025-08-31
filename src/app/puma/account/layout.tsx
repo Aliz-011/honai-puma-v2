@@ -4,16 +4,8 @@ import { PropsWithChildren } from 'react'
 
 const sidebarNavItems = [
   {
-    title: "Account",
-    href: "/honai/account",
-  },
-  {
-    title: "Password",
-    href: "/honai/account/password",
-  },
-  {
     title: "Appearance",
-    href: "/honai/account/appearance",
+    href: "/puma/account/appearance",
   }
 ]
 

@@ -32,21 +32,6 @@ app.use(
     })
 )
 
-// BETTER-AUTH MIDDLEWARE
-// app.use("*", async (c, next) => {
-//     const session = await auth.api.getSession({ headers: c.req.raw.headers });
-
-//     if (!session) {
-//         c.set("user", null);
-//         c.set("session", null);
-//         return await next();
-//     }
-
-//     c.set("user", session.user);
-//     c.set("session", session.session);
-//     return await next();
-// });
-
 const loginSchema = z.object({
     username: z.string().trim().min(1, 'Please enter your username'),
     password: z.string().min(1, "Please enter your password"),

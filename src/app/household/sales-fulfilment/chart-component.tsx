@@ -47,6 +47,7 @@ type IOREPSParams = {
         actual: number;
         drr: number;
         color?: string;
+        date?: string;
         ach_fm: string;
     }[];
 }
@@ -289,7 +290,7 @@ export function ChartPie({ data, date }: PieParams) {
 }
 
 export const ProgressCard = ({ date, data, title }: IOREPSParams) => {
-    const selectedDate = new Date(date)
+    const selectedDate = new Date(data[0].date ?? date)
     const lastDayOfSelectedMonth = endOfMonth(selectedDate);
     const isEndOfMonth = selectedDate.getDate() === lastDayOfSelectedMonth.getDate();
 

@@ -1,9 +1,6 @@
 import { endOfMonth, format, subMonths } from "date-fns"
 
 import {
-    ChartConfig,
-} from "@/components/ui/chart"
-import {
     Card,
     CardContent,
     CardDescription,
@@ -15,77 +12,7 @@ import {
 import type { SalesFulfilmentResponseData } from '@/types'
 import { Separator } from "@/components/ui/separator"
 
-const chartConfig = {
-    funneling_group: {
-        label: "Funneling Group",
-    },
-    registration: {
-        label: "Registration",
-        color: "var(--chart-1)",
-    },
-    provision_issued: {
-        label: "Provision Issued",
-        color: "var(--chart-2)",
-    },
-    provision_completed: {
-        label: "Provision Completed",
-        color: "var(--chart-3)",
-    },
-    activation_completed: {
-        label: "Activation Completed",
-        color: "var(--chart-4)",
-    },
-    fallout: {
-        label: "Fallout",
-        color: "var(--chart-5)",
-    },
-    cancelled: {
-        label: "Cancelled",
-        color: "var(--chart-6)",
-    },
-    label: {
-        color: "var(--background)",
-    },
-} satisfies ChartConfig
-
 export const FunnelingGroup = ({ data, selectedDate }: { data: SalesFulfilmentResponseData[]; selectedDate: Date }) => {
-    const chartData = [
-        {
-            stage: "Registration",
-            value: data[0].registration,
-            percentage: data[0].registration_per,
-            fill: "var(--color-registration)",
-            key: "registration",
-        },
-        {
-            stage: "Provision Issued",
-            value: data[0].provision_issued,
-            percentage: data[0].provision_issued_per,
-            fill: "var(--color-provision_issued)",
-            key: "provision_issued",
-        },
-        {
-            stage: "Provision Completed",
-            value: data[0].provision_completed,
-            percentage: data[0].provision_completed_per,
-            fill: "var(--color-provision_completed)",
-            key: "provision_completed",
-        },
-        {
-            stage: "Activation Completed",
-            value: data[0].activation_completed,
-            percentage: data[0].activation_completed_per,
-            fill: "var(--color-activation_completed)",
-            key: "activation_completed",
-        },
-        {
-            stage: "Fallout",
-            value: data[0].fallout,
-            percentage: data[0].fallout_per,
-            fill: "var(--color-fallout)",
-            key: "fallout",
-        },
-    ]
 
     const lastDayOfSelectedMonth = endOfMonth(selectedDate);
     const isEndOfMonth = selectedDate.getDate() === lastDayOfSelectedMonth.getDate();

@@ -8,7 +8,7 @@ import { summaryRevAllRegional, summaryRevAllBranch, summaryRevAllSubbranch, sum
 import { territoryArea4 } from '@/db/schema/puma_2025'
 import { db } from "@/db";
 import { zValidator } from "@/lib/validator-wrapper";
-import { Regional } from "@/types";
+
 
 const app = new Hono()
     .get('/revenue-gross-prabayar', zValidator('query', z.object({ date: z.coerce.date().optional(), branch: z.string().optional(), subbranch: z.string().optional(), cluster: z.string().optional(), kabupaten: z.string().optional() })),

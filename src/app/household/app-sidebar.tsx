@@ -1,9 +1,7 @@
 import * as React from "react"
 import {
-    PieChart,
     Settings2,
     Command,
-    Target,
     HandCoins,
     HouseWifi,
     FolderIcon,
@@ -12,7 +10,6 @@ import {
     LayoutDashboardIcon,
 } from "lucide-react"
 
-import { NavDocuments } from "./nav-documents"
 import { NavMain } from "./nav-main"
 import { NavSecondary } from "./nav-secondary"
 import { NavUser } from "./nav-user"
@@ -48,22 +45,12 @@ const data = {
             title: "REVENUE & C3MR",
             url: "/household/revenue-c3mr",
             icon: BarChartIcon,
-        },
-        {
-            title: "CONSOLIDATION MOBILE HH",
-            url: "/household/consolidation-mobile-hh",
-            icon: HandCoins,
-        },
-        {
-            title: "OTHERS",
-            url: "/household/others",
-            icon: FolderIcon,
         }
     ],
     navSecondary: [
         {
             title: "Settings",
-            url: "/honai/account",
+            url: "/puma/account/appearance",
             icon: Settings2,
         },
     ],
@@ -75,11 +62,11 @@ const data = {
             items: [
                 {
                     title: "Line In Service",
-                    url: "/honai/fmc/line-in-service",
+                    url: "/puma/fmc/line-in-service",
                 },
                 {
                     title: "WL Connect Wifi",
-                    url: "/honai/fmc/connect-wifi",
+                    url: "/puma/fmc/connect-wifi",
                 }
             ],
         }
@@ -98,7 +85,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     <Command className="size-4" />
                                 </div>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-semibold">Honai PUMA</span>
+                                    <span className="truncate font-semibold">PUMA</span>
                                     <span className="truncate text-xs">Enterprise</span>
                                 </div>
                             </Link>

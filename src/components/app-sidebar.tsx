@@ -37,15 +37,15 @@ const data = {
             items: [
                 {
                     title: "Revenue Gross All",
-                    url: "/honai/revenue-gross",
+                    url: "/puma/revenue-gross",
                 },
                 {
                     title: "Revenue ByU",
-                    url: "/honai/revenue-byu",
+                    url: "/puma/revenue-byu",
                 },
                 {
                     title: "Revenue Gross Prabayar",
-                    url: "/honai/revenue-gross-prabayar",
+                    url: "/puma/revenue-gross-prabayar",
                 },
             ],
         },
@@ -56,7 +56,7 @@ const data = {
             items: [
                 {
                     title: "SO All",
-                    url: "/honai/target-so",
+                    url: "/puma/target-so",
                 }
             ],
         },
@@ -67,11 +67,11 @@ const data = {
             items: [
                 {
                     title: "Revenue New Sales All",
-                    url: "/honai/revenue-new-sales/",
+                    url: "/puma/revenue-new-sales/",
                 },
                 {
                     title: "Revenue New Sales Prabayar",
-                    url: "/honai/revenue-new-sales-prabayar/",
+                    url: "/puma/revenue-new-sales-prabayar/",
                 },
             ],
         },
@@ -82,11 +82,11 @@ const data = {
             items: [
                 {
                     title: "Paying Subs All",
-                    url: "/honai/paying-subs",
+                    url: "/puma/paying-subs",
                 },
                 {
                     title: "Paying LoS 0-1 All",
-                    url: "/honai/paying-los",
+                    url: "/puma/paying-los",
                 }
             ],
         },
@@ -97,11 +97,11 @@ const data = {
             items: [
                 {
                     title: "Revenue CVM All",
-                    url: "/honai/revenue-cvm/",
+                    url: "/puma/revenue-cvm/",
                 },
                 {
                     title: "Revenue CVM Outlet",
-                    url: "/honai/revenue-cvm-outlet",
+                    url: "/puma/revenue-cvm-outlet",
                 }
             ],
         },
@@ -112,7 +112,7 @@ const data = {
             items: [
                 {
                     title: "Revenue Redeem PV Prabyar",
-                    url: "/honai/revenue-redeem-pv",
+                    url: "/puma/revenue-redeem-pv",
                 }
             ],
         },
@@ -123,15 +123,15 @@ const data = {
             items: [
                 {
                     title: "Revenue SA All",
-                    url: "/honai/revenue-sa",
+                    url: "/puma/revenue-sa",
                 },
                 {
                     title: "Revenue SA Prabayar",
-                    url: "/honai/revenue-sa-prabayar",
+                    url: "/puma/revenue-sa-prabayar",
                 },
                 {
                     title: "Revenue SA ByU",
-                    url: "/honai/revenue-sa-byu",
+                    url: "/puma/revenue-sa-byu",
                 },
             ],
         },
@@ -142,15 +142,15 @@ const data = {
             items: [
                 {
                     title: "Trx SA All",
-                    url: "/honai/trx-sa",
+                    url: "/puma/trx-sa",
                 },
                 {
                     title: "Trx SA Prabayar",
-                    url: "/honai/trx-sa-prabayar",
+                    url: "/puma/trx-sa-prabayar",
                 },
                 {
                     title: "Trx SA ByU",
-                    url: "/honai/trx-sa-byu",
+                    url: "/puma/trx-sa-byu",
                 },
             ],
         },
@@ -161,15 +161,15 @@ const data = {
             items: [
                 {
                     title: "Trx New Sales All",
-                    url: "/honai/trx-new-sales",
+                    url: "/puma/trx-new-sales",
                 },
                 {
                     title: "Trx New Sales Prabayar",
-                    url: "/honai/trx-new-sales-prabayar",
+                    url: "/puma/trx-new-sales-prabayar",
                 },
                 {
                     title: "Trx New Sales ByU",
-                    url: "/honai/trx-new-sales-byu",
+                    url: "/puma/trx-new-sales-byu",
                 },
             ],
         },
@@ -177,7 +177,7 @@ const data = {
     navSecondary: [
         {
             title: "Settings",
-            url: "/honai/account",
+            url: "/puma/account/appearance",
             icon: Settings2,
         },
     ],
@@ -189,11 +189,11 @@ const data = {
             items: [
                 {
                     title: "Line In Service",
-                    url: "/honai/fmc/line-in-service",
+                    url: "/puma/fmc/line-in-service",
                 },
                 {
                     title: "WL Connect Wifi",
-                    url: "/honai/fmc/connect-wifi",
+                    url: "/puma/fmc/connect-wifi",
                 }
             ],
         }
@@ -212,7 +212,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     <Command className="size-4" />
                                 </div>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-semibold">Honai PUMA</span>
+                                    <span className="truncate font-semibold">PUMA</span>
                                     <span className="truncate text-xs">Enterprise</span>
                                 </div>
                             </Link>

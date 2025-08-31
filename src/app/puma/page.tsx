@@ -10,5 +10,5 @@ export default function HomeComponent() {
         redirect('/login')
     }
 
-    return redirect('/honai/revenue-gross')
+    return redirect('/puma/revenue-gross')
 }

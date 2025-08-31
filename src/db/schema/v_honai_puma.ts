@@ -1,4 +1,4 @@
-import { mysqlSchema, varchar, double, index, decimal, bigint, int } from "drizzle-orm/mysql-core";
+import { mysqlSchema, varchar, double, index, decimal, bigint, int, date } from "drizzle-orm/mysql-core";
 
 export const honaiPuma = mysqlSchema('v_honai_puma')
 
@@ -3458,4 +3458,659 @@ export const summaryAllConsolidationKabupaten = honaiPuma.table('summary_rev_all
     consolidation_y: varchar('consolidation_y', { length: 30 }),
     consolidation_y1: varchar('consolidation_y1', { length: 30 }),
     consolidation_ytd: varchar('consolidation_ytd', { length: 10 })
+})
+
+export const summaryBBConsolidationBranch = honaiPuma.table('summary_rev_bb_consolidation_branch', {
+    tgl: varchar('tgl', { length: 12 }),
+    branch: varchar('branch', { length: 20 }),
+    rev_bb_m: varchar('rev_bb_m', { length: 30 }),
+    rev_bb_m1: varchar('rev_bb_m1', { length: 30 }),
+    rev_bb_mom: varchar('rev_bb_mom', { length: 10 }),
+    rev_bb_y: varchar('rev_bb_y', { length: 30 }),
+    rev_bb_y1: varchar('rev_bb_y1', { length: 30 }),
+    rev_bb_ytd: varchar('rev_bb_ytd', { length: 10 }),
+    rev_fix_m: varchar('rev_fix_m', { length: 30 }),
+    rev_fix_m1: varchar('rev_fix_m1', { length: 30 }),
+    rev_fix_mom: varchar('rev_fix_mom', { length: 10 }),
+    rev_fix_y: varchar('rev_fix_y', { length: 30 }),
+    rev_fix_y1: varchar('rev_fix_y1', { length: 30 }),
+    rev_fix_ytd: varchar('rev_fix_ytd', { length: 10 }),
+    consolidation_m: varchar('consolidation_m', { length: 30 }),
+    consolidation_m1: varchar('consolidation_m1', { length: 30 }),
+    consolidation_mom: varchar('consolidation_mom', { length: 10 }),
+    consolidation_y: varchar('consolidation_y', { length: 30 }),
+    consolidation_y1: varchar('consolidation_y1', { length: 30 }),
+    consolidation_ytd: varchar('consolidation_ytd', { length: 10 })
+})
+
+export const summaryBBConsolidationCluster = honaiPuma.table('summary_rev_bb_consolidation_cluster', {
+    tgl: varchar('tgl', { length: 12 }),
+    branch: varchar('branch', { length: 30 }),
+    cluster: varchar('cluster', { length: 20 }),
+    rev_bb_m: varchar('rev_bb_m', { length: 30 }),
+    rev_bb_m1: varchar('rev_bb_m1', { length: 30 }),
+    rev_bb_mom: varchar('rev_bb_mom', { length: 10 }),
+    rev_bb_y: varchar('rev_bb_y', { length: 30 }),
+    rev_bb_y1: varchar('rev_bb_y1', { length: 30 }),
+    rev_bb_ytd: varchar('rev_bb_ytd', { length: 10 }),
+    rev_fix_m: varchar('rev_fix_m', { length: 30 }),
+    rev_fix_m1: varchar('rev_fix_m1', { length: 30 }),
+    rev_fix_mom: varchar('rev_fix_mom', { length: 10 }),
+    rev_fix_y: varchar('rev_fix_y', { length: 30 }),
+    rev_fix_y1: varchar('rev_fix_y1', { length: 30 }),
+    rev_fix_ytd: varchar('rev_fix_ytd', { length: 10 }),
+    consolidation_m: varchar('consolidation_m', { length: 30 }),
+    consolidation_m1: varchar('consolidation_m1', { length: 30 }),
+    consolidation_mom: varchar('consolidation_mom', { length: 10 }),
+    consolidation_y: varchar('consolidation_y', { length: 30 }),
+    consolidation_y1: varchar('consolidation_y1', { length: 30 }),
+    consolidation_ytd: varchar('consolidation_ytd', { length: 10 })
+})
+
+export const summaryBBConsolidationKabupaten = honaiPuma.table('summary_rev_bb_consolidation_kabupaten', {
+    tgl: varchar('tgl', { length: 12 }),
+    branch: varchar('branch', { length: 30 }),
+    cluster: varchar('cluster', { length: 30 }),
+    kabupaten: varchar('kabupaten', { length: 20 }),
+    rev_bb_m: varchar('rev_bb_m', { length: 30 }),
+    rev_bb_m1: varchar('rev_bb_m1', { length: 30 }),
+    rev_bb_mom: varchar('rev_bb_mom', { length: 10 }),
+    rev_bb_y: varchar('rev_bb_y', { length: 30 }),
+    rev_bb_y1: varchar('rev_bb_y1', { length: 30 }),
+    rev_bb_ytd: varchar('rev_bb_ytd', { length: 10 }),
+    rev_fix_m: varchar('rev_fix_m', { length: 30 }),
+    rev_fix_m1: varchar('rev_fix_m1', { length: 30 }),
+    rev_fix_mom: varchar('rev_fix_mom', { length: 10 }),
+    rev_fix_y: varchar('rev_fix_y', { length: 30 }),
+    rev_fix_y1: varchar('rev_fix_y1', { length: 30 }),
+    rev_fix_ytd: varchar('rev_fix_ytd', { length: 10 }),
+    consolidation_m: varchar('consolidation_m', { length: 30 }),
+    consolidation_m1: varchar('consolidation_m1', { length: 30 }),
+    consolidation_mom: varchar('consolidation_mom', { length: 10 }),
+    consolidation_y: varchar('consolidation_y', { length: 30 }),
+    consolidation_y1: varchar('consolidation_y1', { length: 30 }),
+    consolidation_ytd: varchar('consolidation_ytd', { length: 10 })
+})
+
+export const summaryPayloadConsolidationBranch = honaiPuma.table('summary_payload_consolidation_branch', {
+    tgl: varchar('tgl', { length: 12 }),
+    branch: varchar('branch', { length: 20 }),
+    payload_mobile_m: varchar('payload_mobile_m', { length: 30 }),
+    payload_mobile_m1: varchar('payload_mobile_m1', { length: 30 }),
+    payload_mobile_mom: varchar('payload_mobile_mom', { length: 10 }),
+    payload_mobile_y: varchar('payload_mobile_y', { length: 30 }),
+    payload_mobile_y1: varchar('payload_mobile_y1', { length: 30 }),
+    payload_mobile_ytd: varchar('payload_mobile_ytd', { length: 10 }),
+    payload_fix_m: varchar('payload_fix_m', { length: 30 }),
+    payload_fix_m1: varchar('payload_fix_m1', { length: 30 }),
+    payload_fix_mom: varchar('payload_fix_mom', { length: 10 }),
+    payload_fix_y: varchar('payload_fix_y', { length: 30 }),
+    payload_fix_y1: varchar('payload_fix_y1', { length: 30 }),
+    payload_fix_ytd: varchar('payload_fix_ytd', { length: 10 }),
+    consolidation_m: varchar('consolidation_m', { length: 30 }),
+    consolidation_m1: varchar('consolidation_m1', { length: 30 }),
+    consolidation_mom: varchar('consolidation_mom', { length: 10 }),
+    consolidation_y: varchar('consolidation_y', { length: 30 }),
+    consolidation_y1: varchar('consolidation_y1', { length: 30 }),
+    consolidation_ytd: varchar('consolidation_ytd', { length: 10 })
+})
+
+export const summaryPayloadConsolidationCluster = honaiPuma.table('summary_payload_consolidation_cluster', {
+    tgl: varchar('tgl', { length: 12 }),
+    branch: varchar('branch', { length: 30 }),
+    cluster: varchar('cluster', { length: 20 }),
+    payload_mobile_m: varchar('payload_mobile_m', { length: 30 }),
+    payload_mobile_m1: varchar('payload_mobile_m1', { length: 30 }),
+    payload_mobile_mom: varchar('payload_mobile_mom', { length: 10 }),
+    payload_mobile_y: varchar('payload_mobile_y', { length: 30 }),
+    payload_mobile_y1: varchar('payload_mobile_y1', { length: 30 }),
+    payload_mobile_ytd: varchar('payload_mobile_ytd', { length: 10 }),
+    payload_fix_m: varchar('payload_fix_m', { length: 30 }),
+    payload_fix_m1: varchar('payload_fix_m1', { length: 30 }),
+    payload_fix_mom: varchar('payload_fix_mom', { length: 10 }),
+    payload_fix_y: varchar('payload_fix_y', { length: 30 }),
+    payload_fix_y1: varchar('payload_fix_y1', { length: 30 }),
+    payload_fix_ytd: varchar('payload_fix_ytd', { length: 10 }),
+    consolidation_m: varchar('consolidation_m', { length: 30 }),
+    consolidation_m1: varchar('consolidation_m1', { length: 30 }),
+    consolidation_mom: varchar('consolidation_mom', { length: 10 }),
+    consolidation_y: varchar('consolidation_y', { length: 30 }),
+    consolidation_y1: varchar('consolidation_y1', { length: 30 }),
+    consolidation_ytd: varchar('consolidation_ytd', { length: 10 })
+})
+
+export const summaryPayloadConsolidationKabupaten = honaiPuma.table('summary_payload_consolidation_kabupaten', {
+    tgl: varchar('tgl', { length: 12 }),
+    branch: varchar('branch', { length: 30 }),
+    cluster: varchar('cluster', { length: 30 }),
+    kabupaten: varchar('kabupaten', { length: 20 }),
+    payload_mobile_m: varchar('payload_mobile_m', { length: 30 }),
+    payload_mobile_m1: varchar('payload_mobile_m1', { length: 30 }),
+    payload_mobile_mom: varchar('payload_mobile_mom', { length: 10 }),
+    payload_mobile_y: varchar('payload_mobile_y', { length: 30 }),
+    payload_mobile_y1: varchar('payload_mobile_y1', { length: 30 }),
+    payload_mobile_ytd: varchar('payload_mobile_ytd', { length: 10 }),
+    payload_fix_m: varchar('payload_fix_m', { length: 30 }),
+    payload_fix_m1: varchar('payload_fix_m1', { length: 30 }),
+    payload_fix_mom: varchar('payload_fix_mom', { length: 10 }),
+    payload_fix_y: varchar('payload_fix_y', { length: 30 }),
+    payload_fix_y1: varchar('payload_fix_y1', { length: 30 }),
+    payload_fix_ytd: varchar('payload_fix_ytd', { length: 10 }),
+    consolidation_m: varchar('consolidation_m', { length: 30 }),
+    consolidation_m1: varchar('consolidation_m1', { length: 30 }),
+    consolidation_mom: varchar('consolidation_mom', { length: 10 }),
+    consolidation_y: varchar('consolidation_y', { length: 30 }),
+    consolidation_y1: varchar('consolidation_y1', { length: 30 }),
+    consolidation_ytd: varchar('consolidation_ytd', { length: 10 })
+})
+
+export const summaryGoliveRegional = honaiPuma.table('summary_golive_regional', {
+    tgl: date('tgl'),
+    regional: varchar('regional', { length: 20 }),
+    golive_m: bigint('golive_m', { mode: 'bigint' }),
+    golive_m1: bigint('golive_m1', { mode: 'bigint' }),
+    golive_m12: bigint('golive_m12', { mode: 'bigint' }),
+    golive_mom: decimal('golive_mom'),
+    golive_y: bigint('golive_y', { mode: 'bigint' }),
+    golive_y1: bigint('golive_y1', { mode: 'bigint' }),
+    golive_yoy: decimal('golive_yoy'),
+    golive_ytd: decimal('golive_ytd')
+})
+
+export const summaryGoliveBranch = honaiPuma.table('summary_golive_branch', {
+    tgl: date('tgl'),
+    regional: varchar('regional', { length: 20 }),
+    branch: varchar('branch', { length: 30 }),
+    golive_m: bigint('golive_m', { mode: 'bigint' }),
+    golive_m1: bigint('golive_m1', { mode: 'bigint' }),
+    golive_m12: bigint('golive_m12', { mode: 'bigint' }),
+    golive_mom: decimal('golive_mom'),
+    golive_y: bigint('golive_y', { mode: 'bigint' }),
+    golive_y1: bigint('golive_y1', { mode: 'bigint' }),
+    golive_yoy: decimal('golive_yoy'),
+    golive_ytd: decimal('golive_ytd')
+})
+
+export const summaryGoliveWok = honaiPuma.table('summary_golive_wok', {
+    tgl: date('tgl'),
+    regional: varchar('regional', { length: 20 }),
+    branch: varchar('branch', { length: 30 }),
+    cluster: varchar('cluster', { length: 30 }),
+    wok: varchar('wok', { length: 20 }),
+    golive_m: bigint('golive_m', { mode: 'bigint' }),
+    golive_m1: bigint('golive_m1', { mode: 'bigint' }),
+    golive_m12: bigint('golive_m12', { mode: 'bigint' }),
+    golive_mom: decimal('golive_mom'),
+    golive_y: bigint('golive_y', { mode: 'bigint' }),
+    golive_y1: bigint('golive_y1', { mode: 'bigint' }),
+    golive_yoy: decimal('golive_yoy'),
+    golive_ytd: decimal('golive_ytd')
+})
+
+export const summaryGoliveSto = honaiPuma.table('summary_golive_sto', {
+    tgl: date('tgl'),
+    regional: varchar('regional', { length: 20 }),
+    branch: varchar('branch', { length: 30 }),
+    cluster: varchar('cluster', { length: 30 }),
+    wok: varchar('wok', { length: 20 }),
+    sto: varchar('sto', { length: 5 }),
+    golive_m: bigint('golive_m', { mode: 'bigint' }),
+    golive_m1: bigint('golive_m1', { mode: 'bigint' }),
+    golive_m12: bigint('golive_m12', { mode: 'bigint' }),
+    golive_mom: decimal('golive_mom'),
+    golive_y: bigint('golive_y', { mode: 'bigint' }),
+    golive_y1: bigint('golive_y1', { mode: 'bigint' }),
+    golive_yoy: decimal('golive_yoy'),
+    golive_ytd: decimal('golive_ytd')
+})
+
+export const summaryGolivePortRegional = honaiPuma.table('summary_golive_port_regional', {
+    tgl: date('tgl'),
+    regional: varchar('regional', { length: 20 }),
+
+    // Available ports columns
+    avai_port_1mo_y: bigint('avai_port_1mo_y', { mode: 'number' }),
+    avai_port_2mo_y: bigint('avai_port_2mo_y', { mode: 'number' }),
+    avai_port_3mo_y: bigint('avai_port_3mo_y', { mode: 'number' }),
+    avai_port_4mo_y: bigint('avai_port_4mo_y', { mode: 'number' }),
+
+    // Used ports current year columns
+    used_1mo_y: bigint('used_1mo_y', { mode: 'number' }),
+    used_2mo_y: bigint('used_2mo_y', { mode: 'number' }),
+    used_3mo_y: bigint('used_3mo_y', { mode: 'number' }),
+    used_4mo_y: bigint('used_4mo_y', { mode: 'number' }),
+    used_gt_6mo_y: bigint('used_gt_6mo_y', { mode: 'number' }),
+    used_all_mo_y: bigint('used_all_mo_y', { mode: 'number' }),
+
+    // Used ports previous year columns
+    used_1mo_y1: bigint('used_1mo_y1', { mode: 'number' }),
+    used_2mo_y1: bigint('used_2mo_y1', { mode: 'number' }),
+    used_3mo_y1: bigint('used_3mo_y1', { mode: 'number' }),
+    used_4mo_y1: bigint('used_4mo_y1', { mode: 'number' }),
+    used_gt_6mo_y1: bigint('used_gt_6mo_y1', { mode: 'number' }),
+    used_all_mo_y1: bigint('used_all_mo_y1', { mode: 'number' }),
+
+    // Amount port current year columns
+    amount_port_1mo_y: bigint('amount_port_1mo_y', { mode: 'number' }),
+    amount_port_2mo_y: bigint('amount_port_2mo_y', { mode: 'number' }),
+    amount_port_3mo_y: bigint('amount_port_3mo_y', { mode: 'number' }),
+    amount_port_4mo_y: bigint('amount_port_4mo_y', { mode: 'number' }),
+    amount_port_gt_6mo_y: bigint('amount_port_gt_6mo_y', { mode: 'number' }),
+    amount_port_all_mo_y: bigint('amount_port_all_mo_y', { mode: 'number' }),
+
+    // Amount port previous year columns
+    amount_port_1mo_y1: bigint('amount_port_1mo_y1', { mode: 'number' }),
+    amount_port_2mo_y1: bigint('amount_port_2mo_y1', { mode: 'number' }),
+    amount_port_3mo_y1: bigint('amount_port_3mo_y1', { mode: 'number' }),
+    amount_port_4mo_y1: bigint('amount_port_4mo_y1', { mode: 'number' }),
+    amount_port_gt_6mo_y1: bigint('amount_port_gt_6mo_y1', { mode: 'number' }),
+    amount_port_all_mo_y1: bigint('amount_port_all_mo_y1', { mode: 'number' })
+})
+
+export const summaryGolivePortBranch = honaiPuma.table('summary_golive_port_branch', {
+    tgl: date('tgl'),
+    regional: varchar('regional', { length: 20 }),
+    branch: varchar('branch', { length: 30 }),
+
+    // Available ports columns
+    avai_port_1mo_y: bigint('avai_port_1mo_y', { mode: 'number' }),
+    avai_port_2mo_y: bigint('avai_port_2mo_y', { mode: 'number' }),
+    avai_port_3mo_y: bigint('avai_port_3mo_y', { mode: 'number' }),
+    avai_port_4mo_y: bigint('avai_port_4mo_y', { mode: 'number' }),
+
+    // Used ports current year columns
+    used_1mo_y: bigint('used_1mo_y', { mode: 'number' }),
+    used_2mo_y: bigint('used_2mo_y', { mode: 'number' }),
+    used_3mo_y: bigint('used_3mo_y', { mode: 'number' }),
+    used_4mo_y: bigint('used_4mo_y', { mode: 'number' }),
+    used_gt_6mo_y: bigint('used_gt_6mo_y', { mode: 'number' }),
+    used_all_mo_y: bigint('used_all_mo_y', { mode: 'number' }),
+
+    // Used ports previous year columns
+    used_1mo_y1: bigint('used_1mo_y1', { mode: 'number' }),
+    used_2mo_y1: bigint('used_2mo_y1', { mode: 'number' }),
+    used_3mo_y1: bigint('used_3mo_y1', { mode: 'number' }),
+    used_4mo_y1: bigint('used_4mo_y1', { mode: 'number' }),
+    used_gt_6mo_y1: bigint('used_gt_6mo_y1', { mode: 'number' }),
+    used_all_mo_y1: bigint('used_all_mo_y1', { mode: 'number' }),
+
+    // Amount port current year columns
+    amount_port_1mo_y: bigint('amount_port_1mo_y', { mode: 'number' }),
+    amount_port_2mo_y: bigint('amount_port_2mo_y', { mode: 'number' }),
+    amount_port_3mo_y: bigint('amount_port_3mo_y', { mode: 'number' }),
+    amount_port_4mo_y: bigint('amount_port_4mo_y', { mode: 'number' }),
+    amount_port_gt_6mo_y: bigint('amount_port_gt_6mo_y', { mode: 'number' }),
+    amount_port_all_mo_y: bigint('amount_port_all_mo_y', { mode: 'number' }),
+
+    // Amount port previous year columns
+    amount_port_1mo_y1: bigint('amount_port_1mo_y1', { mode: 'number' }),
+    amount_port_2mo_y1: bigint('amount_port_2mo_y1', { mode: 'number' }),
+    amount_port_3mo_y1: bigint('amount_port_3mo_y1', { mode: 'number' }),
+    amount_port_4mo_y1: bigint('amount_port_4mo_y1', { mode: 'number' }),
+    amount_port_gt_6mo_y1: bigint('amount_port_gt_6mo_y1', { mode: 'number' }),
+    amount_port_all_mo_y1: bigint('amount_port_all_mo_y1', { mode: 'number' })
+})
+
+export const summaryGolivePortWok = honaiPuma.table('summary_golive_port_wok', {
+    tgl: date('tgl'),
+    regional: varchar('regional', { length: 20 }),
+    branch: varchar('branch', { length: 30 }),
+    cluster: varchar('cluster', { length: 30 }),
+    wok: varchar('wok', { length: 20 }),
+
+    // Available ports columns
+    avai_port_1mo_y: bigint('avai_port_1mo_y', { mode: 'number' }),
+    avai_port_2mo_y: bigint('avai_port_2mo_y', { mode: 'number' }),
+    avai_port_3mo_y: bigint('avai_port_3mo_y', { mode: 'number' }),
+    avai_port_4mo_y: bigint('avai_port_4mo_y', { mode: 'number' }),
+
+    // Used ports current year columns
+    used_1mo_y: bigint('used_1mo_y', { mode: 'number' }),
+    used_2mo_y: bigint('used_2mo_y', { mode: 'number' }),
+    used_3mo_y: bigint('used_3mo_y', { mode: 'number' }),
+    used_4mo_y: bigint('used_4mo_y', { mode: 'number' }),
+    used_gt_6mo_y: bigint('used_gt_6mo_y', { mode: 'number' }),
+    used_all_mo_y: bigint('used_all_mo_y', { mode: 'number' }),
+
+    // Used ports previous year columns
+    used_1mo_y1: bigint('used_1mo_y1', { mode: 'number' }),
+    used_2mo_y1: bigint('used_2mo_y1', { mode: 'number' }),
+    used_3mo_y1: bigint('used_3mo_y1', { mode: 'number' }),
+    used_4mo_y1: bigint('used_4mo_y1', { mode: 'number' }),
+    used_gt_6mo_y1: bigint('used_gt_6mo_y1', { mode: 'number' }),
+    used_all_mo_y1: bigint('used_all_mo_y1', { mode: 'number' }),
+
+    // Amount port current year columns
+    amount_port_1mo_y: bigint('amount_port_1mo_y', { mode: 'number' }),
+    amount_port_2mo_y: bigint('amount_port_2mo_y', { mode: 'number' }),
+    amount_port_3mo_y: bigint('amount_port_3mo_y', { mode: 'number' }),
+    amount_port_4mo_y: bigint('amount_port_4mo_y', { mode: 'number' }),
+    amount_port_gt_6mo_y: bigint('amount_port_gt_6mo_y', { mode: 'number' }),
+    amount_port_all_mo_y: bigint('amount_port_all_mo_y', { mode: 'number' }),
+
+    // Amount port previous year columns
+    amount_port_1mo_y1: bigint('amount_port_1mo_y1', { mode: 'number' }),
+    amount_port_2mo_y1: bigint('amount_port_2mo_y1', { mode: 'number' }),
+    amount_port_3mo_y1: bigint('amount_port_3mo_y1', { mode: 'number' }),
+    amount_port_4mo_y1: bigint('amount_port_4mo_y1', { mode: 'number' }),
+    amount_port_gt_6mo_y1: bigint('amount_port_gt_6mo_y1', { mode: 'number' }),
+    amount_port_all_mo_y1: bigint('amount_port_all_mo_y1', { mode: 'number' })
+})
+
+export const summaryGolivePortSto = honaiPuma.table('summary_golive_port_sto', {
+    tgl: date('tgl'),
+    regional: varchar('regional', { length: 20 }),
+    branch: varchar('branch', { length: 30 }),
+    cluster: varchar('cluster', { length: 30 }),
+    wok: varchar('wok', { length: 20 }),
+    sto: varchar('sto', { length: 5 }),
+
+    // Available ports columns
+    avai_port_1mo_y: bigint('avai_port_1mo_y', { mode: 'number' }),
+    avai_port_2mo_y: bigint('avai_port_2mo_y', { mode: 'number' }),
+    avai_port_3mo_y: bigint('avai_port_3mo_y', { mode: 'number' }),
+    avai_port_4mo_y: bigint('avai_port_4mo_y', { mode: 'number' }),
+
+    // Used ports current year columns
+    used_1mo_y: bigint('used_1mo_y', { mode: 'number' }),
+    used_2mo_y: bigint('used_2mo_y', { mode: 'number' }),
+    used_3mo_y: bigint('used_3mo_y', { mode: 'number' }),
+    used_4mo_y: bigint('used_4mo_y', { mode: 'number' }),
+    used_gt_6mo_y: bigint('used_gt_6mo_y', { mode: 'number' }),
+    used_all_mo_y: bigint('used_all_mo_y', { mode: 'number' }),
+
+    // Used ports previous year columns
+    used_1mo_y1: bigint('used_1mo_y1', { mode: 'number' }),
+    used_2mo_y1: bigint('used_2mo_y1', { mode: 'number' }),
+    used_3mo_y1: bigint('used_3mo_y1', { mode: 'number' }),
+    used_4mo_y1: bigint('used_4mo_y1', { mode: 'number' }),
+    used_gt_6mo_y1: bigint('used_gt_6mo_y1', { mode: 'number' }),
+    used_all_mo_y1: bigint('used_all_mo_y1', { mode: 'number' }),
+
+    // Amount port current year columns
+    amount_port_1mo_y: bigint('amount_port_1mo_y', { mode: 'number' }),
+    amount_port_2mo_y: bigint('amount_port_2mo_y', { mode: 'number' }),
+    amount_port_3mo_y: bigint('amount_port_3mo_y', { mode: 'number' }),
+    amount_port_4mo_y: bigint('amount_port_4mo_y', { mode: 'number' }),
+    amount_port_gt_6mo_y: bigint('amount_port_gt_6mo_y', { mode: 'number' }),
+    amount_port_all_mo_y: bigint('amount_port_all_mo_y', { mode: 'number' }),
+
+    // Amount port previous year columns
+    amount_port_1mo_y1: bigint('amount_port_1mo_y1', { mode: 'number' }),
+    amount_port_2mo_y1: bigint('amount_port_2mo_y1', { mode: 'number' }),
+    amount_port_3mo_y1: bigint('amount_port_3mo_y1', { mode: 'number' }),
+    amount_port_4mo_y1: bigint('amount_port_4mo_y1', { mode: 'number' }),
+    amount_port_gt_6mo_y1: bigint('amount_port_gt_6mo_y1', { mode: 'number' }),
+    amount_port_all_mo_y1: bigint('amount_port_all_mo_y1', { mode: 'number' })
+})
+
+export const summaryOdpRegional = honaiPuma.table('summary_odp_regional', {
+    tgl: varchar('tgl'),
+    regional: varchar('regional', { length: 20 }),
+
+    // Used metrics current month
+    black_used_m: bigint('black_used_m', { mode: 'number' }),
+    red_used_m: bigint('red_used_m', { mode: 'number' }),
+    yellow_used_m: bigint('yellow_used_m', { mode: 'number' }),
+    green_used_m: bigint('green_used_m', { mode: 'number' }),
+    total_used_m: bigint('total_used_m', { mode: 'number' }),
+
+    // Available metrics current month
+    black_avai_m: bigint('black_avai_m', { mode: 'number' }),
+    red_avai_m: bigint('red_avai_m', { mode: 'number' }),
+    yellow_avai_m: bigint('yellow_avai_m', { mode: 'number' }),
+    green_avai_m: bigint('green_avai_m', { mode: 'number' }),
+    total_avai_m: bigint('total_avai_m', { mode: 'number' }),
+
+    // Amount metrics current month
+    black_amount_m: bigint('black_amount_m', { mode: 'number' }),
+    red_amount_m: bigint('red_amount_m', { mode: 'number' }),
+    yellow_amount_m: bigint('yellow_amount_m', { mode: 'number' }),
+    green_amount_m: bigint('green_amount_m', { mode: 'number' }),
+    total_amount_m: bigint('total_amount_m', { mode: 'number' }),
+
+    // ODP metrics current month
+    black_odp_m: bigint('black_odp_m', { mode: 'number' }),
+    red_odp_m: bigint('red_odp_m', { mode: 'number' }),
+    yellow_odp_m: bigint('yellow_odp_m', { mode: 'number' }),
+    green_odp_m: bigint('green_odp_m', { mode: 'number' }),
+    total_odp_m: bigint('total_odp_m', { mode: 'number' }),
+
+    // Used metrics previous month
+    black_used_m1: bigint('black_used_m1', { mode: 'number' }),
+    red_used_m1: bigint('red_used_m1', { mode: 'number' }),
+    yellow_used_m1: bigint('yellow_used_m1', { mode: 'number' }),
+    green_used_m1: bigint('green_used_m1', { mode: 'number' }),
+    total_used_m1: bigint('total_used_m1', { mode: 'number' }),
+
+    // Available metrics previous month
+    black_avai_m1: bigint('black_avai_m1', { mode: 'number' }),
+    red_avai_m1: bigint('red_avai_m1', { mode: 'number' }),
+    yellow_avai_m1: bigint('yellow_avai_m1', { mode: 'number' }),
+    green_avai_m1: bigint('green_avai_m1', { mode: 'number' }),
+    total_avai_m1: bigint('total_avai_m1', { mode: 'number' }),
+
+    // Amount metrics previous month
+    black_amount_m1: bigint('black_amount_m1', { mode: 'number' }),
+    red_amount_m1: bigint('red_amount_m1', { mode: 'number' }),
+    yellow_amount_m1: bigint('yellow_amount_m1', { mode: 'number' }),
+    green_amount_m1: bigint('green_amount_m1', { mode: 'number' }),
+    total_amount_m1: bigint('total_amount_m1', { mode: 'number' }),
+
+    // ODP metrics previous month
+    black_odp_m1: bigint('black_odp_m1', { mode: 'number' }),
+    red_odp_m1: bigint('red_odp_m1', { mode: 'number' }),
+    yellow_odp_m1: bigint('yellow_odp_m1', { mode: 'number' }),
+    green_odp_m1: bigint('green_odp_m1', { mode: 'number' }),
+    total_odp_m1: bigint('total_odp_m1', { mode: 'number' }),
+
+    // Used MoM (Month over Month) percentages
+    black_used_mom: decimal('black_used_mom', { precision: 10, scale: 2 }),
+    red_used_mom: decimal('red_used_mom', { precision: 10, scale: 2 }),
+    yellow_used_mom: decimal('yellow_used_mom', { precision: 10, scale: 2 }),
+    green_used_mom: decimal('green_used_mom', { precision: 10, scale: 2 }),
+    total_used_mom: decimal('total_used_mom', { precision: 10, scale: 2 }),
+
+    // Available MoM percentages
+    black_avai_mom: decimal('black_avai_mom', { precision: 10, scale: 2 }),
+    red_avai_mom: decimal('red_avai_mom', { precision: 10, scale: 2 }),
+    yellow_avai_mom: decimal('yellow_avai_mom', { precision: 10, scale: 2 }),
+    green_avai_mom: decimal('green_avai_mom', { precision: 10, scale: 2 }),
+    total_avai_mom: decimal('total_avai_mom', { precision: 10, scale: 2 }),
+
+    // Amount MoM percentages
+    black_amount_mom: decimal('black_amount_mom', { precision: 10, scale: 2 }),
+    red_amount_mom: decimal('red_amount_mom', { precision: 10, scale: 2 }),
+    yellow_amount_mom: decimal('yellow_amount_mom', { precision: 10, scale: 2 }),
+    green_amount_mom: decimal('green_amount_mom', { precision: 10, scale: 2 }),
+    total_amount_mom: decimal('total_amount_mom', { precision: 10, scale: 2 }),
+
+    // ODP MoM percentages
+    black_odp_mom: decimal('black_odp_mom', { precision: 10, scale: 2 }),
+    red_odp_mom: decimal('red_odp_mom', { precision: 10, scale: 2 }),
+    yellow_odp_mom: decimal('yellow_odp_mom', { precision: 10, scale: 2 }),
+    green_odp_mom: decimal('green_odp_mom', { precision: 10, scale: 2 }),
+    total_odp_mom: decimal('total_odp_mom', { precision: 10, scale: 2 })
+})
+
+export const summaryOdpBranch = honaiPuma.table('summary_odp_branch', {
+    tgl: varchar('tgl'),
+    regional: varchar('regional', { length: 20 }),
+    branch: varchar('branch', { length: 30 }),
+
+    // Used metrics current month
+    black_used_m: bigint('black_used_m', { mode: 'number' }),
+    red_used_m: bigint('red_used_m', { mode: 'number' }),
+    yellow_used_m: bigint('yellow_used_m', { mode: 'number' }),
+    green_used_m: bigint('green_used_m', { mode: 'number' }),
+    total_used_m: bigint('total_used_m', { mode: 'number' }),
+
+    // Available metrics current month
+    black_avai_m: bigint('black_avai_m', { mode: 'number' }),
+    red_avai_m: bigint('red_avai_m', { mode: 'number' }),
+    yellow_avai_m: bigint('yellow_avai_m', { mode: 'number' }),
+    green_avai_m: bigint('green_avai_m', { mode: 'number' }),
+    total_avai_m: bigint('total_avai_m', { mode: 'number' }),
+
+    // Amount metrics current month
+    black_amount_m: bigint('black_amount_m', { mode: 'number' }),
+    red_amount_m: bigint('red_amount_m', { mode: 'number' }),
+    yellow_amount_m: bigint('yellow_amount_m', { mode: 'number' }),
+    green_amount_m: bigint('green_amount_m', { mode: 'number' }),
+    total_amount_m: bigint('total_amount_m', { mode: 'number' }),
+
+    // ODP metrics current month
+    black_odp_m: bigint('black_odp_m', { mode: 'number' }),
+    red_odp_m: bigint('red_odp_m', { mode: 'number' }),
+    yellow_odp_m: bigint('yellow_odp_m', { mode: 'number' }),
+    green_odp_m: bigint('green_odp_m', { mode: 'number' }),
+    total_odp_m: bigint('total_odp_m', { mode: 'number' }),
+
+    // Used metrics previous month
+    black_used_m1: bigint('black_used_m1', { mode: 'number' }),
+    red_used_m1: bigint('red_used_m1', { mode: 'number' }),
+    yellow_used_m1: bigint('yellow_used_m1', { mode: 'number' }),
+    green_used_m1: bigint('green_used_m1', { mode: 'number' }),
+    total_used_m1: bigint('total_used_m1', { mode: 'number' }),
+
+    // Available metrics previous month
+    black_avai_m1: bigint('black_avai_m1', { mode: 'number' }),
+    red_avai_m1: bigint('red_avai_m1', { mode: 'number' }),
+    yellow_avai_m1: bigint('yellow_avai_m1', { mode: 'number' }),
+    green_avai_m1: bigint('green_avai_m1', { mode: 'number' }),
+    total_avai_m1: bigint('total_avai_m1', { mode: 'number' }),
+
+    // Amount metrics previous month
+    black_amount_m1: bigint('black_amount_m1', { mode: 'number' }),
+    red_amount_m1: bigint('red_amount_m1', { mode: 'number' }),
+    yellow_amount_m1: bigint('yellow_amount_m1', { mode: 'number' }),
+    green_amount_m1: bigint('green_amount_m1', { mode: 'number' }),
+    total_amount_m1: bigint('total_amount_m1', { mode: 'number' }),
+
+    // ODP metrics previous month
+    black_odp_m1: bigint('black_odp_m1', { mode: 'number' }),
+    red_odp_m1: bigint('red_odp_m1', { mode: 'number' }),
+    yellow_odp_m1: bigint('yellow_odp_m1', { mode: 'number' }),
+    green_odp_m1: bigint('green_odp_m1', { mode: 'number' }),
+    total_odp_m1: bigint('total_odp_m1', { mode: 'number' }),
+
+    // Used MoM (Month over Month) percentages
+    black_used_mom: decimal('black_used_mom', { precision: 10, scale: 2 }),
+    red_used_mom: decimal('red_used_mom', { precision: 10, scale: 2 }),
+    yellow_used_mom: decimal('yellow_used_mom', { precision: 10, scale: 2 }),
+    green_used_mom: decimal('green_used_mom', { precision: 10, scale: 2 }),
+    total_used_mom: decimal('total_used_mom', { precision: 10, scale: 2 }),
+
+    // Available MoM percentages
+    black_avai_mom: decimal('black_avai_mom', { precision: 10, scale: 2 }),
+    red_avai_mom: decimal('red_avai_mom', { precision: 10, scale: 2 }),
+    yellow_avai_mom: decimal('yellow_avai_mom', { precision: 10, scale: 2 }),
+    green_avai_mom: decimal('green_avai_mom', { precision: 10, scale: 2 }),
+    total_avai_mom: decimal('total_avai_mom', { precision: 10, scale: 2 }),
+
+    // Amount MoM percentages
+    black_amount_mom: decimal('black_amount_mom', { precision: 10, scale: 2 }),
+    red_amount_mom: decimal('red_amount_mom', { precision: 10, scale: 2 }),
+    yellow_amount_mom: decimal('yellow_amount_mom', { precision: 10, scale: 2 }),
+    green_amount_mom: decimal('green_amount_mom', { precision: 10, scale: 2 }),
+    total_amount_mom: decimal('total_amount_mom', { precision: 10, scale: 2 }),
+
+    // ODP MoM percentages
+    black_odp_mom: decimal('black_odp_mom', { precision: 10, scale: 2 }),
+    red_odp_mom: decimal('red_odp_mom', { precision: 10, scale: 2 }),
+    yellow_odp_mom: decimal('yellow_odp_mom', { precision: 10, scale: 2 }),
+    green_odp_mom: decimal('green_odp_mom', { precision: 10, scale: 2 }),
+    total_odp_mom: decimal('total_odp_mom', { precision: 10, scale: 2 })
+})
+
+export const summaryOdpWok = honaiPuma.table('summary_odp_wok', {
+    tgl: varchar('tgl'),
+    regional: varchar('regional', { length: 20 }),
+    branch: varchar('branch', { length: 30 }),
+    cluster: varchar('cluster', { length: 30 }),
+    wok: varchar('wok', { length: 20 }),
+
+    // Used metrics current month
+    black_used_m: bigint('black_used_m', { mode: 'number' }),
+    red_used_m: bigint('red_used_m', { mode: 'number' }),
+    yellow_used_m: bigint('yellow_used_m', { mode: 'number' }),
+    green_used_m: bigint('green_used_m', { mode: 'number' }),
+    total_used_m: bigint('total_used_m', { mode: 'number' }),
+
+    // Available metrics current month
+    black_avai_m: bigint('black_avai_m', { mode: 'number' }),
+    red_avai_m: bigint('red_avai_m', { mode: 'number' }),
+    yellow_avai_m: bigint('yellow_avai_m', { mode: 'number' }),
+    green_avai_m: bigint('green_avai_m', { mode: 'number' }),
+    total_avai_m: bigint('total_avai_m', { mode: 'number' }),
+
+    // Amount metrics current month
+    black_amount_m: bigint('black_amount_m', { mode: 'number' }),
+    red_amount_m: bigint('red_amount_m', { mode: 'number' }),
+    yellow_amount_m: bigint('yellow_amount_m', { mode: 'number' }),
+    green_amount_m: bigint('green_amount_m', { mode: 'number' }),
+    total_amount_m: bigint('total_amount_m', { mode: 'number' }),
+
+    // ODP metrics current month
+    black_odp_m: bigint('black_odp_m', { mode: 'number' }),
+    red_odp_m: bigint('red_odp_m', { mode: 'number' }),
+    yellow_odp_m: bigint('yellow_odp_m', { mode: 'number' }),
+    green_odp_m: bigint('green_odp_m', { mode: 'number' }),
+    total_odp_m: bigint('total_odp_m', { mode: 'number' }),
+
+    // Used metrics previous month
+    black_used_m1: bigint('black_used_m1', { mode: 'number' }),
+    red_used_m1: bigint('red_used_m1', { mode: 'number' }),
+    yellow_used_m1: bigint('yellow_used_m1', { mode: 'number' }),
+    green_used_m1: bigint('green_used_m1', { mode: 'number' }),
+    total_used_m1: bigint('total_used_m1', { mode: 'number' }),
+
+    // Available metrics previous month
+    black_avai_m1: bigint('black_avai_m1', { mode: 'number' }),
+    red_avai_m1: bigint('red_avai_m1', { mode: 'number' }),
+    yellow_avai_m1: bigint('yellow_avai_m1', { mode: 'number' }),
+    green_avai_m1: bigint('green_avai_m1', { mode: 'number' }),
+    total_avai_m1: bigint('total_avai_m1', { mode: 'number' }),
+
+    // Amount metrics previous month
+    black_amount_m1: bigint('black_amount_m1', { mode: 'number' }),
+    red_amount_m1: bigint('red_amount_m1', { mode: 'number' }),
+    yellow_amount_m1: bigint('yellow_amount_m1', { mode: 'number' }),
+    green_amount_m1: bigint('green_amount_m1', { mode: 'number' }),
+    total_amount_m1: bigint('total_amount_m1', { mode: 'number' }),
+
+    // ODP metrics previous month
+    black_odp_m1: bigint('black_odp_m1', { mode: 'number' }),
+    red_odp_m1: bigint('red_odp_m1', { mode: 'number' }),
+    yellow_odp_m1: bigint('yellow_odp_m1', { mode: 'number' }),
+    green_odp_m1: bigint('green_odp_m1', { mode: 'number' }),
+    total_odp_m1: bigint('total_odp_m1', { mode: 'number' }),
+
+    // Used MoM (Month over Month) percentages
+    black_used_mom: decimal('black_used_mom', { precision: 10, scale: 2 }),
+    red_used_mom: decimal('red_used_mom', { precision: 10, scale: 2 }),
+    yellow_used_mom: decimal('yellow_used_mom', { precision: 10, scale: 2 }),
+    green_used_mom: decimal('green_used_mom', { precision: 10, scale: 2 }),
+    total_used_mom: decimal('total_used_mom', { precision: 10, scale: 2 }),
+
+    // Available MoM percentages
+    black_avai_mom: decimal('black_avai_mom', { precision: 10, scale: 2 }),
+    red_avai_mom: decimal('red_avai_mom', { precision: 10, scale: 2 }),
+    yellow_avai_mom: decimal('yellow_avai_mom', { precision: 10, scale: 2 }),
+    green_avai_mom: decimal('green_avai_mom', { precision: 10, scale: 2 }),
+    total_avai_mom: decimal('total_avai_mom', { precision: 10, scale: 2 }),
+
+    // Amount MoM percentages
+    black_amount_mom: decimal('black_amount_mom', { precision: 10, scale: 2 }),
+    red_amount_mom: decimal('red_amount_mom', { precision: 10, scale: 2 }),
+    yellow_amount_mom: decimal('yellow_amount_mom', { precision: 10, scale: 2 }),
+    green_amount_mom: decimal('green_amount_mom', { precision: 10, scale: 2 }),
+    total_amount_mom: decimal('total_amount_mom', { precision: 10, scale: 2 }),
+
+    // ODP MoM percentages
+    black_odp_mom: decimal('black_odp_mom', { precision: 10, scale: 2 }),
+    red_odp_mom: decimal('red_odp_mom', { precision: 10, scale: 2 }),
+    yellow_odp_mom: decimal('yellow_odp_mom', { precision: 10, scale: 2 }),
+    green_odp_mom: decimal('green_odp_mom', { precision: 10, scale: 2 }),
+    total_odp_mom: decimal('total_odp_mom', { precision: 10, scale: 2 })
 })

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation"
 const Page = () => {
     const { data } = useCurrentSession()
 
-    if (!data) {
+    if (!data?.user) {
         redirect('/login')
     }
 

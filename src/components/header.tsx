@@ -50,7 +50,7 @@ export const Header = () => {
                                     <Command className="size-4" />
                                 </div>
                                 <div className="grid flex-1 text-left text-sm leading-tight ml-2.5">
-                                    <span className="truncate font-semibold">Honai PUMA</span>
+                                    <span className="truncate font-semibold">PUMA</span>
                                     <span className="truncate text-xs">Enterprise</span>
                                 </div>
                             </div>
@@ -85,7 +85,7 @@ export const Header = () => {
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuGroup>
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => navigate.push('/honai/account')}>
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => navigate.push('/puma/account')}>
                                     <UserCircleIcon />
                                     Account
                                 </DropdownMenuItem>
