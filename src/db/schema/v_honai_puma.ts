@@ -3845,7 +3845,7 @@ export const summaryGolivePortSto = honaiPuma.table('summary_golive_port_sto', {
 })
 
 export const summaryOdpRegional = honaiPuma.table('summary_odp_regional', {
-    tgl: varchar('tgl'),
+    tgl: varchar('tgl', { length: 20 }),
     regional: varchar('regional', { length: 20 }),
 
     // Used metrics current month
@@ -3934,7 +3934,7 @@ export const summaryOdpRegional = honaiPuma.table('summary_odp_regional', {
 })
 
 export const summaryOdpBranch = honaiPuma.table('summary_odp_branch', {
-    tgl: varchar('tgl'),
+    tgl: varchar('tgl', { length: 20 }),
     regional: varchar('regional', { length: 20 }),
     branch: varchar('branch', { length: 30 }),
 
@@ -4024,7 +4024,7 @@ export const summaryOdpBranch = honaiPuma.table('summary_odp_branch', {
 })
 
 export const summaryOdpWok = honaiPuma.table('summary_odp_wok', {
-    tgl: varchar('tgl'),
+    tgl: varchar('tgl', { length: 20 }),
     regional: varchar('regional', { length: 20 }),
     branch: varchar('branch', { length: 30 }),
     cluster: varchar('cluster', { length: 30 }),

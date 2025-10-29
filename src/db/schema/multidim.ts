@@ -1,4 +1,4 @@
-import { index, mysqlSchema, varchar } from "drizzle-orm/mysql-core";
+import { index, mysqlSchema, varchar, int, decimal } from "drizzle-orm/mysql-core";
 
 const multidim = mysqlSchema('multidim')
 
@@ -48,5 +48,67 @@ export const dynamicMultidimTable = (year: string, month: string, day: string) =
     }, t => [
         index('msisdn').on(t.msisdn).using('btree'),
         index('kabupaten').on(t.kabupaten).using('btree')
+    ])
+}
+
+export const dynamicMultidim = (year: string, month: string) => {
+    return multidim.table(`multidim_${year}${month}`, {
+        trx_date: varchar({ length: 20 }),
+        msisdn: varchar({ length: 20 }),
+        bcp_interest_chat: varchar({ length: 50 }),
+        rev_data_m2: varchar({ length: 20 }),
+        rev_data_m3: varchar({ length: 20 }),
+        activation_date: varchar({ length: 10 }),
+        area_sales: varchar({ length: 20 }),
+        region_sales: varchar({ length: 30 }),
+        branch: varchar({ length: 30 }),
+        subbranch: varchar({ length: 30 }),
+        cluster_sales: varchar({ length: 30 }),
+        kabupaten: varchar({ length: 30 }),
+        kecamatan: varchar({ length: 30 }),
+        vol_data_m1: varchar({ length: 20 }),
+        segment_data_user: varchar({ length: 20 }),
+        los: int(),
+        rev_data_m1: decimal({ precision: 20, scale: 2 }),
+        rev_data_mtd: decimal({ precision: 20, scale: 2 }),
+        rev_data_mtd_m1: decimal({ precision: 20, scale: 2 }),
+        vol_data_mtd: decimal({ precision: 20, scale: 2 }),
+        rev_data_pack_m1: decimal({ precision: 20, scale: 2 }),
+        rev_data_pack_mtd: decimal({ precision: 20, scale: 2 }),
+        rev_data_pack_mtd_m1: decimal({ precision: 20, scale: 2 }),
+        rev_digital_m3: decimal({ precision: 20, scale: 2 }),
+        rev_digital_m2: decimal({ precision: 20, scale: 2 }),
+        rev_digital_m1: decimal({ precision: 20, scale: 2 }),
+        rev_digital_mtd: decimal({ precision: 20, scale: 2 }),
+        rev_digital_mtd_m1: decimal({ precision: 20, scale: 2 }),
+        brand: varchar({ length: 20 }),
+        status: varchar({ length: 15 }),
+        day_of_usage: varchar({ length: 20 }),
+        expire_date: varchar({ length: 10 }),
+        grace_date: varchar({ length: 10 }),
+        rev_m2: decimal({ precision: 20, scale: 2 }),
+        rev_m3: decimal({ precision: 20, scale: 2 }),
+        rev_m1: decimal({ precision: 20, scale: 2 }),
+        rev_mtd: decimal({ precision: 20, scale: 2 }),
+        rev_mtd_m1: decimal({ precision: 20, scale: 2 }),
+        device_os: varchar({ length: 20 }),
+        device_type: varchar({ length: 50 }),
+        device_network: varchar({ length: 20 }),
+        rev_voice_m3: decimal({ precision: 20, scale: 2 }),
+        rev_voice_m2: decimal({ precision: 20, scale: 2 }),
+        rev_voice_m1: decimal({ precision: 20, scale: 2 }),
+        rev_voice_mtd: decimal({ precision: 20, scale: 2 }),
+        rev_voice_mtd_m1: decimal({ precision: 20, scale: 2 }),
+        tsel_poin: varchar({ length: 20 }),
+        balance: varchar({ length: 20 }),
+        site_id: varchar({ length: 20 }),
+        lifestage: int(),
+        interim_lifestage: int(),
+        event_date: varchar({ length: 10 })
+    }, t => [
+        index('msisdn').on(t.msisdn).using('btree'),
+        index('kecamatan').on(t.kecamatan).using('btree'),
+        index('kabupaten').on(t.kabupaten).using('btree'),
+        index('site_id').on(t.site_id).using('btree'),
     ])
 }

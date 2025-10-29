@@ -127,12 +127,12 @@ const Page = () => {
                                     <GoliveCard
                                         title="New Golive"
                                         data={[
-                                            { label: 'MTD', value: data[0].golive_m.toLocaleString('id-ID') },
-                                            { label: 'M-1', value: data[0].golive_m1 },
-                                            { label: 'MoM', value: data[0].golive_mom, className: getValueStyle(data[0].golive_mom) },
-                                            { label: 'YTD', value: data[0].golive_y.toLocaleString('id-ID') },
-                                            { label: 'Y-1', value: data[0].golive_y1.toLocaleString('id-ID') },
-                                            { label: 'YoY', value: data[0].golive_yoy, className: getValueStyle(data[0].golive_yoy) },
+                                            { label: 'MTD', value: data[0].golive_m || '0' },
+                                            { label: 'M-1', value: data[0].golive_m1 || ' 0' },
+                                            { label: 'MoM', value: data[0].golive_mom || '0%', className: getValueStyle(data[0].golive_mom || '0%') },
+                                            { label: 'YTD', value: data[0].golive_y || '0' },
+                                            { label: 'Y-1', value: data[0].golive_y1 || '0' },
+                                            { label: 'YoY', value: data[0].golive_yoy || '0%', className: getValueStyle(data[0].golive_yoy || '0%') },
                                         ]}
                                     />
 

@@ -14,7 +14,7 @@ const app = new Hono()
     .get('/io-re-ps', zValidator('query', z.object({ date: z.string().optional(), branch: z.string().optional(), wok: z.string().optional() })),
         async c => {
             const { date, branch, wok } = c.req.valid('query')
-            const selectedDate = date ? new Date(date) : subDays(new Date(), 2)
+            const selectedDate = date ? new Date(date) : subDays(new Date(), 1)
 
             const currMonth = format(selectedDate, 'MM')
             const currYear = format(selectedDate, 'yyyy')
@@ -1095,8 +1095,8 @@ const app = new Hono()
             const regionalGoLive = db
                 .select({
                     regional: sql<string>`CASE WHEN telkomsel_regional IN ('PUMA', 'MALUKU DAN PAPUA') THEN 'MALUKU DAN PAPUA' END`.as('regional'),
-                    golive_m: sql<number>`COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${currStartOfMonth} AND ${currDate} THEN 1 END)`.as('golive_m'),
-                    golive_m1: sql<number>`COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${prevStartOfMonth} AND ${prevDate2} THEN 1 END)`.as('golive_m1'),
+                    golive_m: sql<number>`COALESCE(COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${currStartOfMonth} AND ${currDate} THEN 1 END), 0)`.as('golive_m'),
+                    golive_m1: sql<number>`COALESCE(COUNT(CASE WHEN ${ih_occ_golive_ihld.tanggal_go_live_uim} BETWEEN ${prevStartOfMonth} AND ${prevDate2} THEN 1 END), 0)`.as('golive_m1'),
 
                     // Add y and y1 calculations here directly
                     golive_y: sql<number>`COUNT(CASE WHEN tahun_go_live_uim = 2025 THEN 1 END)`.as('golive_y'),
@@ -1500,6 +1500,7 @@ const app = new Hono()
                 .where(and(
                     gt(ih_demand_mysiis.target, 0),
                     eq(ih_demand_mysiis.region, 'MALUKU DAN PAPUA'),
+                    inArray(ih_demand_mysiis.status_new_bispro, ['Wait Approval AI', 'Draft']),
                     sql`YEAR(${ih_demand_mysiis.approved_at}) = ${currYear}`
                 ))
                 .groupBy(sql`1`)
@@ -1888,6 +1889,7 @@ const app = new Hono()
                 .where(and(
                     gt(ih_demand_mysiis.target, 0),
                     eq(ih_demand_mysiis.region, 'MALUKU DAN PAPUA'),
+                    inArray(ih_demand_mysiis.status_new_bispro, ['Wait Approval AI', 'Draft']),
                     sql`YEAR(${ih_demand_mysiis.approved_at}) = ${currYear}`
                 ))
                 .groupBy(sql`1`)

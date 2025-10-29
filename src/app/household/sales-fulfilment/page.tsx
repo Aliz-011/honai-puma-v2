@@ -221,7 +221,7 @@ const Page = () => {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             {/* Header Section with Filters */}
             <div className="px-4 py-4">
-                <Filters daysBehind={2} handleClick={handleClick} disabled={isLoading || isLoadingSf} />
+                <Filters daysBehind={1} handleClick={handleClick} disabled={isLoading || isLoadingSf} />
             </div>
 
             <div className="mx-auto px-4 py-8 space-y-10">

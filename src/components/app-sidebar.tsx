@@ -125,33 +125,14 @@ const data = {
                     title: "Revenue SA All",
                     url: "/puma/revenue-sa",
                 },
-                {
-                    title: "Revenue SA Prabayar",
-                    url: "/puma/revenue-sa-prabayar",
-                },
-                {
-                    title: "Revenue SA ByU",
-                    url: "/puma/revenue-sa-byu",
-                },
-            ],
-        },
-        {
-            title: "Trx SA",
-            url: "#",
-            icon: Target,
-            items: [
-                {
-                    title: "Trx SA All",
-                    url: "/puma/trx-sa",
-                },
-                {
-                    title: "Trx SA Prabayar",
-                    url: "/puma/trx-sa-prabayar",
-                },
-                {
-                    title: "Trx SA ByU",
-                    url: "/puma/trx-sa-byu",
-                },
+                // {
+                //     title: "Revenue SA Prabayar",
+                //     url: "/puma/revenue-sa-prabayar",
+                // },
+                // {
+                //     title: "Revenue SA ByU",
+                //     url: "/puma/revenue-sa-byu",
+                // },
             ],
         },
         {
